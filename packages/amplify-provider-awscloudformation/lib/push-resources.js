@@ -363,7 +363,7 @@ function uploadTemplateToS3(context, resourceDir, cfnFile, category, resourceNam
       return s3.uploadFile(s3Params);
     })
     .then(projectBucket => {
-      const templateURL = `https://s3.amazonaws.com/${projectBucket}/amplify-cfn-templates/${category}/${cfnFile}`;
+      const templateURL = `https://${projectBucket}.s3.amazonaws.com/amplify-cfn-templates/${category}/${cfnFile}`;
       const providerMetadata = amplifyMeta[category][resourceName].providerMetadata || {};
       providerMetadata.s3TemplateURL = templateURL;
       providerMetadata.logicalId = category + resourceName;

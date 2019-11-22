@@ -1,6 +1,6 @@
 import Template from 'cloudform-types/types/template';
-import { Fn, CloudFormation, StringParameter } from 'cloudform-types';
-import { getTemplateReferences } from './getTemplateReferences';
+import {Fn, CloudFormation, StringParameter} from 'cloudform-types';
+import {getTemplateReferences} from './getTemplateReferences';
 import getIn from './getIn';
 import setIn from './setIn';
 import blankTemplate from './blankTemplate';
@@ -19,12 +19,14 @@ export interface NestedStacks {
   // The full stack mapping for the deployment.
   stackMapping: { [resourceId: string]: string };
 }
+
 interface NestedStackInfo {
   stackDependencyMap: { [k: string]: string[] };
   stackParameterMap: { [k: string]: { [p: string]: any } };
 }
 
 export type StackRules = Map<string, string>;
+
 export interface SplitStackOptions {
   stack: Template;
   stackRules: StackRules;
@@ -38,6 +40,7 @@ export interface SplitStackOptions {
     deploymentKeyParameterName: string;
   };
 }
+
 export default function splitStack(opts: SplitStackOptions): NestedStacks {
   const stack = opts.stack;
   const stackRules = opts.stackRules;
@@ -148,8 +151,8 @@ export default function splitStack(opts: SplitStackOptions): NestedStacks {
    */
   function replaceReferences(stacks: { [name: string]: Template }, resourceToStackMap: { [key: string]: string }): NestedStackInfo {
     // For each stack create a list of stacks that it depends on.
-    const stackDependsOnMap: { [k: string]: string[] } = Object.keys(stacks).reduce((acc, k) => ({ ...acc, [k]: [] }), {});
-    const stackParamsMap: { [k: string]: { [p: string]: any } } = Object.keys(stacks).reduce((acc, k) => ({ ...acc, [k]: {} }), {});
+    const stackDependsOnMap: { [k: string]: string[] } = Object.keys(stacks).reduce((acc, k) => ({...acc, [k]: []}), {});
+    const stackParamsMap: { [k: string]: { [p: string]: any } } = Object.keys(stacks).reduce((acc, k) => ({...acc, [k]: {}}), {});
     for (const thisStackName of Object.keys(stacks)) {
       const template = stacks[thisStackName];
       const resourceToReferenceMap = getTemplateReferences(template);
@@ -284,7 +287,7 @@ export default function splitStack(opts: SplitStackOptions): NestedStacks {
    * @param stacks The list of stacks keyed by filename.
    */
   function updateRootWithNestedStacks(root: Template, stacks: { [key: string]: Template }, stackInfo: NestedStackInfo) {
-    const stackFileNames = Object.keys(stacks);
+    const stackFileNames = Array.from(Object.keys(stacks));
     const allParamNames = Object.keys(root.Parameters);
     // Forward all parent parameters
     const allParamValues = allParamNames.reduce(
@@ -296,24 +299,34 @@ export default function splitStack(opts: SplitStackOptions): NestedStacks {
     );
     // Also forward the API id of the top level API.
     // allParamValues[ResourceConstants.RESOURCES.GraphQLAPILogicalID] = Fn.GetAtt(ResourceConstants.RESOURCES.GraphQLAPILogicalID, 'ApiId')
-    for (const stackName of stackFileNames) {
+    const MAX_CONCURRENT_STACKS = 5;
+    let x = 1;
+
+    stackFileNames.forEach((stackName, index) => {
       const dependsOnStacks = stackInfo.stackDependencyMap[stackName] || [];
       const extraParams = stackInfo.stackParameterMap[stackName] || {};
-      let stackResource = new CloudFormation.Stack({
+
+      x++;
+      if (x > MAX_CONCURRENT_STACKS) {
+        x = 1;
+      }
+
+      const previousKey = stackFileNames[Math.max(index - x, 0)];
+      const stackResource = new CloudFormation.Stack({
         Parameters: {
           ...allParamValues,
           ...extraParams,
         },
-        TemplateURL: Fn.Join('/', [
-          'https://s3.amazonaws.com',
-          Fn.Ref(opts.deployment.deploymentBucketParameterName),
-          Fn.Ref(opts.deployment.deploymentKeyParameterName),
-          'stacks',
-          stackName + '.json',
-        ]),
+        TemplateURL: Fn.Sub(
+          ''.concat('https://${', opts.deployment.deploymentBucketParameterName, '}.s3.amazonaws.com/${',
+            opts.deployment.deploymentKeyParameterName, '}/stacks/', stackName, '.json'), {}
+        ),
       }).dependsOn([...defaultDependencies, ...dependsOnStacks]);
+      if (previousKey && previousKey !== stackName) {
+        stackResource.dependsOn([previousKey, ...defaultDependencies, ...dependsOnStacks])
+      }
       root.Resources[stackName] = stackResource;
-    }
+    });
     return root;
   }
 
@@ -321,7 +334,7 @@ export default function splitStack(opts: SplitStackOptions): NestedStacks {
   const resourceToStackMap = mapResourcesToStack(templateJson);
   const outputToStackMap = mapOutputsToStack(templateJson);
   const mappingToStackMap = mapMappingToStack(templateJson);
-  const stackMapping = { ...resourceToStackMap, ...outputToStackMap, ...mappingToStackMap };
+  const stackMapping = {...resourceToStackMap, ...outputToStackMap, ...mappingToStackMap};
   const stacks = collectTemplates(templateJson, resourceToStackMap, outputToStackMap, stackMapping);
   const stackInfo = replaceReferences(stacks, resourceToStackMap);
   let rootStack = stacks[rootStackName];

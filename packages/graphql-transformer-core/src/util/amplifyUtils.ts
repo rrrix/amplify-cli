@@ -1,11 +1,12 @@
 const fs = require('fs-extra');
+const {exec} = require('child_process');
 import * as path from 'path';
-import { CloudFormation, Fn, Template } from 'cloudform-types';
-import { DeploymentResources } from '../DeploymentResources';
-import { GraphQLTransform, StackMapping } from '../GraphQLTransform';
-import { ResourceConstants } from 'graphql-transformer-common';
-import { walkDirPosix, readFromPath, writeToPath, throwIfNotJSONExt, emptyDirectory } from './fileUtils';
-import { writeConfig, TransformConfig, TransformMigrationConfig, loadProject, readSchema, loadConfig } from './transformConfig';
+import {CloudFormation, Fn, Template} from 'cloudform-types';
+import {DeploymentResources} from '../DeploymentResources';
+import {GraphQLTransform, StackMapping} from '../GraphQLTransform';
+import {ResourceConstants} from 'graphql-transformer-common';
+import {walkDirPosix, readFromPath, writeToPath, throwIfNotJSONExt, emptyDirectory} from './fileUtils';
+import {writeConfig, TransformConfig, TransformMigrationConfig, loadProject, readSchema, loadConfig} from './transformConfig';
 import * as Sanity from './sanity-check';
 
 export const TRANSFORM_CONFIG_FILE_NAME = `transform.conf.json`;
@@ -88,7 +89,7 @@ function adjustBuildForMigration(resources: DeploymentResources, migrationConfig
     if (resourceIdsToHoist.length === 0) {
       return resources;
     }
-    const resourceIdMap = resourceIdsToHoist.reduce((acc: any, k: string) => ({ ...acc, [k]: true }), {});
+    const resourceIdMap = resourceIdsToHoist.reduce((acc: any, k: string) => ({...acc, [k]: true}), {});
     for (const stackKey of Object.keys(resources.stacks)) {
       const template = resources.stacks[stackKey];
       for (const resourceKey of Object.keys(template.Resources)) {
@@ -119,7 +120,7 @@ function adjustBuildForMigration(resources: DeploymentResources, migrationConfig
  * working without changes.
  */
 async function ensureMissingStackMappings(config: ProjectOptions) {
-  const { currentCloudBackendDirectory } = config;
+  const {currentCloudBackendDirectory} = config;
   let transformOutput = undefined;
 
   if (currentCloudBackendDirectory) {
@@ -171,7 +172,7 @@ async function ensureMissingStackMappings(config: ProjectOptions) {
       // If there are missing stack mappings, we write them to disk.
       if (Object.keys(missingStackMappings).length) {
         let conf = await loadConfig(config.projectDirectory);
-        conf = { ...conf, StackMapping: { ...getOrDefault(conf, 'StackMapping', {}), ...missingStackMappings } };
+        conf = {...conf, StackMapping: {...getOrDefault(conf, 'StackMapping', {}), ...missingStackMappings}};
         await writeConfig(config.projectDirectory, conf);
       }
     }
@@ -267,13 +268,17 @@ function mergeUserConfigWithTransformOutput(userConfig: Partial<DeploymentResour
     const stackResourceId = userStack.split(/[^A-Za-z]/).join('');
     const customNestedStack = new CloudFormation.Stack({
       Parameters: parametersForStack,
-      TemplateURL: Fn.Join('/', [
-        'https://s3.amazonaws.com',
-        Fn.Ref(ResourceConstants.PARAMETERS.S3DeploymentBucket),
-        Fn.Ref(ResourceConstants.PARAMETERS.S3DeploymentRootKey),
-        'stacks',
-        userStack,
-      ]),
+      TemplateURL:
+        Fn.Sub(
+          `https://\${${ResourceConstants.PARAMETERS.S3DeploymentBucket}.s3.amazonaws.com/\${${ResourceConstants.PARAMETERS.S3DeploymentRootKey}}/stacks/${userStack}`,
+          {}),
+      //   Fn.Join('/', [
+      //   'https://s3.amazonaws.com',
+      //   Fn.Ref(ResourceConstants.PARAMETERS.S3DeploymentBucket),
+      //   Fn.Ref(ResourceConstants.PARAMETERS.S3DeploymentRootKey),
+      //   'stacks',
+      //   userStack,
+      // ]),
     }).dependsOn(allResourceIds);
     rootStack.Resources[stackResourceId] = customNestedStack;
   }
@@ -289,8 +294,10 @@ function mergeUserConfigWithTransformOutput(userConfig: Partial<DeploymentResour
 
 export interface UploadOptions {
   directory: string;
+
   upload(blob: { Key: string; Body: Buffer | string }): Promise<string>;
 }
+
 /**
  * Reads deployment assets from disk and uploads to the cloud via an uploader.
  * @param opts Deployment options.
@@ -309,6 +316,35 @@ export async function uploadDeployment(opts: UploadOptions) {
   } catch (e) {
     throw e;
   }
+}
+
+function execAndLog(command: string) {
+  console.log(`exec: ${command}`);
+  exec(command, (error, stdout, stderr) => {
+    if (error) {
+      console.error(`exec error: ${error}`);
+      return;
+    }
+    if (stdout) {
+      console.log(`stdout: ${stdout}`);
+    }
+    if (stderr) {
+      console.log(`stderr: ${stderr}`);
+    }
+  });
+}
+
+function flipJsonToYaml(jsonFileName: string) {
+  const yamlFileName = jsonFileName.replace('.json', '.yaml');
+  let flipCommand = `cfn-flip --yaml --clean ${jsonFileName} ${yamlFileName}`;
+  // flipCommand += `&& mv ${jsonFileName} ${jsonFileName}.bak`;
+  // flipCommand += `&& mv ${yamlFileName} ${jsonFileName}`;
+  execAndLog(flipCommand);
+
+  // const moveCommandOne = `mv ${jsonFileName} ${jsonFileName}.bak`;
+  // execAndLog(moveCommandOne);
+  // const moveCommandTwo = `mv ${yamlFileName} ${jsonFileName}`;
+  // execAndLog(moveCommandTwo);
 }
 
 /**
@@ -362,6 +398,7 @@ async function writeDeploymentToDisk(
     stackString =
       typeof stackString === 'string' ? deployment.stacks[stackFileName] : JSON.stringify(deployment.stacks[stackFileName], null, 4);
     fs.writeFileSync(fullStackPath, stackString);
+    flipJsonToYaml(fullStackPath);
   }
 
   // Write any functions to disk
@@ -379,6 +416,8 @@ async function writeDeploymentToDisk(
   const rootStackPath = path.normalize(directory + `/${rootStackFileName}`);
   fs.writeFileSync(rootStackPath, JSON.stringify(rootStack, null, 4));
 
+  flipJsonToYaml(rootStackPath);
+
   // Write params to disk
   const jsonString = JSON.stringify(buildParameters, null, 4);
   const parametersOutputFilePath = path.join(directory, PARAMETERS_FILE_NAME);
@@ -389,6 +428,7 @@ interface MigrationOptions {
   projectDirectory: string;
   cloudBackendDirectory?: string;
 }
+
 /**
  * Using the current cloudbackend as the source of truth of the current env,
  * move the deployment forward to the intermediate stage before allowing the
@@ -418,6 +458,7 @@ export async function migrateAPIProject(opts: MigrationOptions) {
     cloudBackend: copyOfCloudBackend,
   };
 }
+
 export async function revertAPIMigration(directory: string, oldProject: AmplifyApiV1Project) {
   await fs.remove(directory);
   await writeToPath(directory, oldProject);
@@ -428,6 +469,7 @@ interface AmplifyApiV1Project {
   parameters: any;
   template: Template;
 }
+
 /**
  * Read the configuration for the old version of amplify CLI.
  */
@@ -538,7 +580,7 @@ async function updateToIntermediateProject(projectDirectory: string, project: Am
         break;
       }
       case 'AWS::AppSync::GraphQLSchema':
-        const alteredResource = { ...resource };
+        const alteredResource = {...resource};
         alteredResource.Properties.DefinitionS3Location = {
           'Fn::Sub': [
             's3://${S3DeploymentBucket}/${S3DeploymentRootKey}/schema.graphql',

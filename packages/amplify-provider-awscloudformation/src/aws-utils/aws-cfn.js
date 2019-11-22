@@ -214,7 +214,7 @@ class CloudFormation {
         return s3.uploadFile(s3Params);
       })
       .then(bucketName => {
-        const templateURL = `https://s3.amazonaws.com/${bucketName}/${cfnFile}`;
+        const templateURL = `https://${bucketName}.s3.amazonaws.com/${cfnFile}`;
         const cfnStackCheckParams = {
           StackName: stackName,
         };

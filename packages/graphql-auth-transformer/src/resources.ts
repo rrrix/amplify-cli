@@ -1,7 +1,7 @@
 import Template from 'cloudform-types/types/template';
 import Policy from 'cloudform-types/types/iam/policy';
-import { AppSync, Fn, StringParameter, Refs, NumberParameter, IAM, Value } from 'cloudform-types';
-import { AuthRule, AuthProvider } from './AuthRule';
+import {AppSync, Fn, StringParameter, Refs, NumberParameter, IAM, Value} from 'cloudform-types';
+import {AuthRule, AuthProvider} from './AuthRule';
 import {
   str,
   ref,
@@ -26,12 +26,12 @@ import {
   ifElse,
   newline,
 } from 'graphql-mapping-template';
-import { ResourceConstants, NONE_VALUE } from 'graphql-transformer-common';
-import GraphQLApi, { UserPoolConfig, GraphQLApiProperties, OpenIDConnectConfig, AdditionalAuthenticationProvider } from './graphQlApi';
+import {ResourceConstants, NONE_VALUE} from 'graphql-transformer-common';
+import GraphQLApi, {UserPoolConfig, GraphQLApiProperties, OpenIDConnectConfig, AdditionalAuthenticationProvider} from './graphQlApi';
 import * as Transformer from './ModelAuthTransformer';
-import { FieldDefinitionNode } from 'graphql';
+import {FieldDefinitionNode} from 'graphql';
 
-import { DEFAULT_OWNER_FIELD, DEFAULT_IDENTITY_FIELD, DEFAULT_GROUPS_FIELD, DEFAULT_GROUP_CLAIM } from './constants';
+import {DEFAULT_OWNER_FIELD, DEFAULT_IDENTITY_FIELD, DEFAULT_GROUPS_FIELD, DEFAULT_GROUP_CLAIM} from './constants';
 
 function replaceIfUsername(identityClaim: string): string {
   return identityClaim === 'username' ? 'cognito:username' : identityClaim;
@@ -382,6 +382,7 @@ groupsField: "${rule.groupsField || DEFAULT_GROUPS_FIELD}", groupClaim: "${rule.
       this.ownershipAuthorizationExpressionForSubscriptions(rules, variableToCheck, variableToSet),
     ]);
   }
+
   public ownershipAuthorizationExpressionForSubscriptions(
     rules: AuthRule[],
     variableToCheck: string = 'ctx.args',
@@ -403,11 +404,11 @@ groupsField: "${rule.groupsField || DEFAULT_GROUPS_FIELD}", groupClaim: "${rule.
         set(ref(allowedOwnersVariable), raw(`$util.defaultIfNull($${variableToCheck}.${ownerAttribute}, null)`)),
         isUser
           ? // tslint:disable-next-line
-            set(
-              ref('identityValue'),
-              raw(`$util.defaultIfNull($ctx.identity.claims.get("${rawUsername}"),
+          set(
+            ref('identityValue'),
+            raw(`$util.defaultIfNull($ctx.identity.claims.get("${rawUsername}"),
                         $util.defaultIfNull($ctx.identity.claims.get("${identityAttribute}"), "${NONE_VALUE}"))`)
-            )
+          )
           : set(ref('identityValue'), raw(`$util.defaultIfNull($ctx.identity.claims.get("${identityAttribute}"), "${NONE_VALUE}")`)),
         // If a list of owners check for at least one.
         iff(
@@ -480,12 +481,12 @@ identityClaim: "${rule.identityField || rule.identityClaim || DEFAULT_IDENTITY_F
         set(ref(allowedOwnersVariable), raw(`$util.defaultIfNull($${variableToCheck}.${ownerAttribute}, null)`)),
         isUser
           ? // tslint:disable-next-line
-            set(
-              ref('identityValue'),
-              raw(
-                `$util.defaultIfNull($ctx.identity.claims.get("${rawUsername}"), $util.defaultIfNull($ctx.identity.claims.get("${identityAttribute}"), "${NONE_VALUE}"))`
-              )
+          set(
+            ref('identityValue'),
+            raw(
+              `$util.defaultIfNull($ctx.identity.claims.get("${rawUsername}"), $util.defaultIfNull($ctx.identity.claims.get("${identityAttribute}"), "${NONE_VALUE}"))`
             )
+          )
           : set(ref('identityValue'), raw(`$util.defaultIfNull($ctx.identity.claims.get("${identityAttribute}"), "${NONE_VALUE}")`)),
         // If a list of owners check for at least one.
         iff(
@@ -627,11 +628,11 @@ identityClaim: "${rule.identityField || rule.identityClaim || DEFAULT_IDENTITY_F
         // tslint:disable
         isUser
           ? raw(
-              `$util.qr($ownerAuthExpressionValues.put(":${identityName}", $util.dynamodb.toDynamoDB($util.defaultIfNull($ctx.identity.claims.get("${rawUsername}"), $util.defaultIfNull($ctx.identity.claims.get("${identityAttribute}"), "${NONE_VALUE}")))))`
-            )
+          `$util.qr($ownerAuthExpressionValues.put(":${identityName}", $util.dynamodb.toDynamoDB($util.defaultIfNull($ctx.identity.claims.get("${rawUsername}"), $util.defaultIfNull($ctx.identity.claims.get("${identityAttribute}"), "${NONE_VALUE}")))))`
+          )
           : raw(
-              `$util.qr($ownerAuthExpressionValues.put(":${identityName}", $util.dynamodb.toDynamoDB($util.defaultIfNull($ctx.identity.claims.get("${identityAttribute}"), "${NONE_VALUE}"))))`
-            )
+          `$util.qr($ownerAuthExpressionValues.put(":${identityName}", $util.dynamodb.toDynamoDB($util.defaultIfNull($ctx.identity.claims.get("${identityAttribute}"), "${NONE_VALUE}"))))`
+          )
         // tslint:enable
       );
       ruleNumber++;
@@ -703,12 +704,12 @@ identityClaim: "${rule.identityField || rule.identityClaim || DEFAULT_IDENTITY_F
         set(ref(allowedOwnersVariable), ref(`${variableToCheck}.${ownerAttribute}`)),
         isUser
           ? // tslint:disable-next-line
-            set(
-              ref('identityValue'),
-              raw(
-                `$util.defaultIfNull($ctx.identity.claims.get("${rawUsername}"), $util.defaultIfNull($ctx.identity.claims.get("${identityAttribute}"), "${NONE_VALUE}"))`
-              )
+          set(
+            ref('identityValue'),
+            raw(
+              `$util.defaultIfNull($ctx.identity.claims.get("${rawUsername}"), $util.defaultIfNull($ctx.identity.claims.get("${identityAttribute}"), "${NONE_VALUE}"))`
             )
+          )
           : set(ref('identityValue'), raw(`$util.defaultIfNull($ctx.identity.claims.get("${identityAttribute}"), "${NONE_VALUE}")`)),
         iff(
           raw(`$util.isList($${allowedOwnersVariable})`),
@@ -971,37 +972,42 @@ identityClaim: "${rule.identityField || rule.identityClaim || DEFAULT_IDENTITY_F
     const authPiece = isAuthPolicy ? 'auth' : 'unauth';
     const policyResources: object[] = [];
 
-    for (const resource of resources) {
-      // We always have 2 parts, no need to check
-      const resourceParts = resource.split('/');
+    policyResources.push(
+      Fn.Sub('arn:aws:appsync:${AWS::Region}:${AWS::AccountId}:apis/${GraphQLAPI.ApiId}/*', {})
+    );
 
-      if (resourceParts[1] !== 'null') {
-        policyResources.push(
-          Fn.Sub('arn:aws:appsync:${AWS::Region}:${AWS::AccountId}:apis/${apiId}/types/${typeName}/fields/${fieldName}', {
-            apiId: {
-              'Fn::GetAtt': ['GraphQLAPI', 'ApiId'],
-            },
-            typeName: resourceParts[0],
-            fieldName: resourceParts[1],
-          })
-        );
-      } else {
-        policyResources.push(
-          Fn.Sub('arn:aws:appsync:${AWS::Region}:${AWS::AccountId}:apis/${apiId}/types/${typeName}/*', {
-            apiId: {
-              'Fn::GetAtt': ['GraphQLAPI', 'ApiId'],
-            },
-            typeName: resourceParts[0],
-          })
-        );
-      }
-    }
+    // bowenr: removed this because we have WAY too many resources that are protected, and causes CFN template to be *huge*
+    // for (const resource of resources) {
+    //   // We always have 2 parts, no need to check
+    //   const resourceParts = resource.split('/');
+    //
+    //   if (resourceParts[1] !== 'null') {
+    //     policyResources.push(
+    //       Fn.Sub('arn:aws:appsync:${AWS::Region}:${AWS::AccountId}:apis/${apiId}/types/${typeName}/fields/${fieldName}', {
+    //         apiId: {
+    //           'Fn::GetAtt': ['GraphQLAPI', 'ApiId'],
+    //         },
+    //         typeName: resourceParts[0],
+    //         fieldName: resourceParts[1],
+    //       })
+    //     );
+    //   } else {
+    //     policyResources.push(
+    //       Fn.Sub('arn:aws:appsync:${AWS::Region}:${AWS::AccountId}:apis/${apiId}/types/${typeName}/*', {
+    //         apiId: {
+    //           'Fn::GetAtt': ['GraphQLAPI', 'ApiId'],
+    //         },
+    //         typeName: resourceParts[0],
+    //       })
+    //     );
+    //   }
+    // }
 
     return new IAM.Policy({
       PolicyName: `appsync-${authPiece}role-policy`,
       Roles: [
         //HACK double casting needed because it cannot except Ref
-        ({ Ref: `${authPiece}RoleName` } as unknown) as Value<string>,
+        ({Ref: `${authPiece}RoleName`} as unknown) as Value<string>,
       ],
       PolicyDocument: {
         Version: '2012-10-17',
