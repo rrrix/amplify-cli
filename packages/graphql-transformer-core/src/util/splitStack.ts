@@ -1,6 +1,6 @@
 import Template from 'cloudform-types/types/template';
-import {Fn, CloudFormation, StringParameter} from 'cloudform-types';
-import {getTemplateReferences} from './getTemplateReferences';
+import { Fn, CloudFormation, StringParameter } from 'cloudform-types';
+import { getTemplateReferences } from './getTemplateReferences';
 import getIn from './getIn';
 import setIn from './setIn';
 import blankTemplate from './blankTemplate';
@@ -151,8 +151,8 @@ export default function splitStack(opts: SplitStackOptions): NestedStacks {
    */
   function replaceReferences(stacks: { [name: string]: Template }, resourceToStackMap: { [key: string]: string }): NestedStackInfo {
     // For each stack create a list of stacks that it depends on.
-    const stackDependsOnMap: { [k: string]: string[] } = Object.keys(stacks).reduce((acc, k) => ({...acc, [k]: []}), {});
-    const stackParamsMap: { [k: string]: { [p: string]: any } } = Object.keys(stacks).reduce((acc, k) => ({...acc, [k]: {}}), {});
+    const stackDependsOnMap: { [k: string]: string[] } = Object.keys(stacks).reduce((acc, k) => ({ ...acc, [k]: [] }), {});
+    const stackParamsMap: { [k: string]: { [p: string]: any } } = Object.keys(stacks).reduce((acc, k) => ({ ...acc, [k]: {} }), {});
     for (const thisStackName of Object.keys(stacks)) {
       const template = stacks[thisStackName];
       const resourceToReferenceMap = getTemplateReferences(template);
@@ -299,7 +299,11 @@ export default function splitStack(opts: SplitStackOptions): NestedStacks {
     );
     // Also forward the API id of the top level API.
     // allParamValues[ResourceConstants.RESOURCES.GraphQLAPILogicalID] = Fn.GetAtt(ResourceConstants.RESOURCES.GraphQLAPILogicalID, 'ApiId')
-    const MAX_CONCURRENT_STACKS = 5;
+
+    // MAX_CONCURRENT_STACKS is a magic number that will create a dependency tree for
+    // schemas with large numbers of types. DynamoDB has a limit on the number of
+    // Indexed Tables and GSI's that can be concurrently created.
+    const MAX_CONCURRENT_STACKS = 10;
     let x = 1;
 
     stackFileNames.forEach((stackName, index) => {
@@ -317,13 +321,13 @@ export default function splitStack(opts: SplitStackOptions): NestedStacks {
           ...allParamValues,
           ...extraParams,
         },
-        TemplateURL: Fn.Sub(
-          ''.concat('https://${', opts.deployment.deploymentBucketParameterName, '}.s3.amazonaws.com/${',
-            opts.deployment.deploymentKeyParameterName, '}/stacks/', stackName, '.json'), {}
-        ),
+        TemplateURL: Fn.Sub(`https://\${S3DeploymentBucket}.s3.amazonaws.com/\${S3DeploymentRootKey}/stacks/${stackName}.yaml`, {
+          S3DeploymentBucket: { Ref: 'S3DeploymentBucket' },
+          S3DeploymentRootKey: { Ref: 'S3DeploymentRootKey' },
+        }),
       }).dependsOn([...defaultDependencies, ...dependsOnStacks]);
       if (previousKey && previousKey !== stackName) {
-        stackResource.dependsOn([previousKey, ...defaultDependencies, ...dependsOnStacks])
+        stackResource.dependsOn([previousKey, ...defaultDependencies, ...dependsOnStacks]);
       }
       root.Resources[stackName] = stackResource;
     });
@@ -334,7 +338,7 @@ export default function splitStack(opts: SplitStackOptions): NestedStacks {
   const resourceToStackMap = mapResourcesToStack(templateJson);
   const outputToStackMap = mapOutputsToStack(templateJson);
   const mappingToStackMap = mapMappingToStack(templateJson);
-  const stackMapping = {...resourceToStackMap, ...outputToStackMap, ...mappingToStackMap};
+  const stackMapping = { ...resourceToStackMap, ...outputToStackMap, ...mappingToStackMap };
   const stacks = collectTemplates(templateJson, resourceToStackMap, outputToStackMap, stackMapping);
   const stackInfo = replaceReferences(stacks, resourceToStackMap);
   let rootStack = stacks[rootStackName];
