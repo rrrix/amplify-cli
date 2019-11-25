@@ -24,9 +24,9 @@ class S3 {
       ? projectDetails.amplifyMeta.providers[providerName].DeploymentBucketName
       : projectDetails.teamProviderInfo[envName][providerName].DeploymentBucketName;
     s3Params.Bucket = projectBucket;
-
+    console.log(`s3.PutObject(s3://${s3Params.Bucket}/${s3Params.Key})`);
     return this.s3
-      .putObject(s3Params)
+      .upload(s3Params)
       .promise()
       .then(() => projectBucket);
   }
@@ -39,7 +39,7 @@ class S3 {
       ? projectDetails.amplifyMeta.providers[providerName].DeploymentBucketName
       : projectDetails.teamProviderInfo[envName][providerName].DeploymentBucketName;
     s3Params.Bucket = projectBucket;
-
+    console.log(`s3.GetObject(s3://${s3Params.Bucket}/${s3Params.Key})`);
     return this.s3
       .getObject(s3Params)
       .promise()
