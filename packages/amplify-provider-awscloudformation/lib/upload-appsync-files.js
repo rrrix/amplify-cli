@@ -12,11 +12,14 @@ const { hashElement } = require('folder-hash');
 const PARAM_FILE_NAME = 'parameters.json';
 const CF_FILE_NAME = 'cloudformation-template.json';
 
+const configurationManager = require('../lib/configuration-manager');
+
 function getProjectBucket(context) {
   const projectDetails = context.amplify.getProjectDetails();
   const projectBucket = projectDetails.amplifyMeta.providers ? projectDetails.amplifyMeta.providers[providerName].DeploymentBucketName : '';
   return projectBucket;
 }
+
 /**
  * Updates build/parameters.json with new timestamps and then uploads the
  * contents of the build/ directory to S3.
@@ -26,6 +29,7 @@ function getProjectBucket(context) {
  * @param {*} options
  */
 async function uploadAppSyncFiles(context, resourcesToUpdate, allResources, options = {}) {
+  context.print.info('Uploading AppSync Files...');
   const allApiResourceToUpdate = resourcesToUpdate.filter(resource => resource.service === 'AppSync');
   const allApiResources = allResources.filter(resource => resource.service === 'AppSync');
   const { defaultParams, useDeprecatedParameters } = options;
@@ -115,7 +119,7 @@ async function uploadAppSyncFiles(context, resourcesToUpdate, allResources, opti
 
             context.print.warning(
               "APIKeyExpirationEpoch parameter's -1 value is deprecated to disable " +
-                'the API Key creation. In the future CreateAPIKey parameter replaces this behavior.'
+              'the API Key creation. In the future CreateAPIKey parameter replaces this behavior.'
             );
           } else {
             currentParameters.CreateAPIKey = 1;
@@ -158,6 +162,66 @@ async function uploadAppSyncFiles(context, resourcesToUpdate, allResources, opti
     fs.writeFileSync(parametersOutputFilePath, jsonString, 'utf8');
   };
 
+  async function awsCliS3Sync(resourceBuildDir, deploymentRootKey) {
+    const util = require('util');
+    const exec = util.promisify(require('child_process').exec);
+    const { spawnSync } = require('child_process');
+    const projectDetails = context.amplify.getProjectDetails();
+    const { envName } = context.amplify.getEnvInfo();
+    const projectBucket = projectDetails.amplifyMeta.providers
+      ? projectDetails.amplifyMeta.providers[providerName].DeploymentBucketName
+      : projectDetails.teamProviderInfo[envName][providerName].DeploymentBucketName;
+
+    const configuration = await configurationManager.loadConfiguration(context);
+
+    // console.log(JSON.stringify(configuration, null, 4));
+    const awscliOptions = {
+      env: {
+        ...process.env,
+        AWS_DEFAULT_REGION: configuration.region,
+        AWS_ACCESS_KEY_ID: configuration.accessKeyId,
+        AWS_SECRET_ACCESS_KEY: configuration.secretAccessKey,
+        AWS_SESSION_TOKEN: configuration.sessionToken,
+      },
+    };
+    // We're going to use the AWS CLI to copy files, as it's highly optimized for this task
+    const awsS3SyncCommand = `aws s3 sync ${resourceBuildDir} s3://${projectBucket}/${deploymentRootKey}/`;
+    context.print.info(`Using AWS CLI for S3 transfer: ${awsS3SyncCommand}`);
+    const s3target = `s3://${projectBucket}/${deploymentRootKey}/`;
+    const s3SyncResult = spawnSync('aws', ['s3', 'sync', resourceBuildDir, s3target], awscliOptions);
+
+    context.print.info(s3SyncResult.output);
+    if (s3SyncResult.status === 0) {
+      context.print.info(s3SyncResult.output);
+    } else {
+      context.print.error(s3SyncResult.output);
+    }
+    // const { stdout, stderr } = await exec(awsS3SyncCommand, awscliOptions);
+    // if (stdout) {
+    //   context.print.info(stdout);
+    // }
+    // if (stderr) {
+    //   context.print.error(stderr);
+    // }
+  }
+
+  // eslint-disable-next-line no-unused-vars
+  async function uploadApiProject(resourceBuildDir, deploymentRootKey, s3Client) {
+    await TransformPackage.uploadAPIProject({
+      directory: resourceBuildDir,
+      upload: async blob => {
+        const { Key, Body } = blob;
+        const fullKey = `${deploymentRootKey}/${Key}`;
+
+        // return console.log(`${fullKey}`);
+        return await s3Client.uploadFile({
+          Key: fullKey,
+          Body,
+        });
+      },
+    });
+  }
+
   // There can only be one appsync resource
   if (allApiResourceToUpdate.length > 0) {
     const resource = allApiResourceToUpdate[0];
@@ -169,23 +233,15 @@ async function uploadAppSyncFiles(context, resourcesToUpdate, allResources, opti
     writeUpdatedParametersJson(resource, deploymentRootKey);
 
     // Upload build/* to S3.
-    const s3Client = await new S3(context);
     if (!fs.existsSync(resourceBuildDir)) {
+      context.print.warning(`Warning: resourceBuildDir ${resourceBuildDir} not found!`);
       return;
     }
-    await TransformPackage.uploadAPIProject({
-      directory: resourceBuildDir,
-      upload: async blob => {
-        const { Key, Body } = blob;
-        const fullKey = `${deploymentRootKey}/${Key}`;
-
-        return await s3Client.uploadFile({
-          Key: fullKey,
-          Body,
-        });
-      },
-    });
+    await awsCliS3Sync(resourceBuildDir, deploymentRootKey);
+    // const s3Client = await new S3(context);
+    // await uploadApiProject(resourceBuildDir, deploymentRootKey, s3Client);
   } else if (allApiResources.length > 0) {
+    context.print.info(`Updating API Parameters`);
     // We need to update the parameters file even when we are not deploying the API
     // category to fix a bug around deployments on CI/CD platforms. Basically if a
     // build has not run on this machine before and we are updating a non-api category,
@@ -197,6 +253,8 @@ async function uploadAppSyncFiles(context, resourcesToUpdate, allResources, opti
     const resourceDir = path.normalize(path.join(backEndDir, category, resourceName));
     const deploymentRootKey = await getDeploymentRootKey(resourceDir);
     writeUpdatedParametersJson(resource, deploymentRootKey);
+  } else {
+    context.print.error(`Unexpected error, missing API resources?`);
   }
 }
 
