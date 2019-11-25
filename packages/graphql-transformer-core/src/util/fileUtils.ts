@@ -86,10 +86,14 @@ export async function handleFile(handler: FileHandler, key: string, body: Buffer
     throw e;
   }
 }
-
+async function asyncForEach(array, callback) {
+  for (let index = 0; index < array.length; index += 1) {
+    await callback(array[index], index, array);
+  }
+}
 export async function walkDirRec(dir: string, handler: FileHandler, relativePath: string = '', joinPath: (...paths: string[]) => string) {
   const files = await fs.readdir(dir);
-  for (const file of files) {
+  await asyncForEach(files, async file => {
     const resourcePath = path.join(dir, file);
     const newRelPath = joinPath(relativePath, file);
     const isDirectory = (await fs.lstat(resourcePath)).isDirectory();
@@ -99,7 +103,7 @@ export async function walkDirRec(dir: string, handler: FileHandler, relativePath
       const resourceContents = await fs.readFile(resourcePath);
       await handleFile(handler, newRelPath, resourceContents);
     }
-  }
+  });
 }
 
 export async function walkDir(dir: string, handler: (file: { Key: string; Body: Buffer | string }) => Promise<string>) {
