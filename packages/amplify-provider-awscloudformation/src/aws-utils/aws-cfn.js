@@ -17,6 +17,7 @@ const CFN_POLL_TIME = 5 * 1000; // 5 secs wait to check if  new stacks are creat
 const CFN_SUCCESS_STATUS = ['UPDATE_COMPLETE', 'CREATE_COMPLETE', 'DELETE_COMPLETE', 'DELETE_SKIPPED'];
 
 const CNF_ERROR_STATUS = ['CREATE_FAILED', 'DELETE_FAILED', 'UPDATE_FAILED'];
+
 class CloudFormation {
   constructor(context, userAgentAction, options = {}) {
     return (async () => {
@@ -157,6 +158,7 @@ class CloudFormation {
       this.pollQueueStacks.splice(index, 1);
     }
   }
+
   showNewEvents(events) {
     const allShownEvents = this.stackEvents;
     let newEvents = [];
@@ -189,6 +191,7 @@ class CloudFormation {
   }
 
   updateResourceStack(dir, cfnFile) {
+    this.context.print.info(`Updating Resource Stack ${cfnFile}`);
     const filePath = path.normalize(path.join(dir, cfnFile));
     const projectDetails = this.context.amplify.getProjectDetails();
     const stackName = projectDetails.amplifyMeta.providers ? projectDetails.amplifyMeta.providers[providerName].StackName : '';
