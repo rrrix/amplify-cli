@@ -32,6 +32,7 @@ import * as Transformer from './ModelAuthTransformer';
 import {FieldDefinitionNode} from 'graphql';
 
 import {DEFAULT_OWNER_FIELD, DEFAULT_IDENTITY_FIELD, DEFAULT_GROUPS_FIELD, DEFAULT_GROUP_CLAIM} from './constants';
+import {GetAtt} from "cloudform-types/types/functions";
 
 function replaceIfUsername(identityClaim: string): string {
   return identityClaim === 'username' ? 'cognito:username' : identityClaim;
@@ -973,7 +974,7 @@ identityClaim: "${rule.identityField || rule.identityClaim || DEFAULT_IDENTITY_F
     const policyResources: object[] = [];
 
     policyResources.push(
-      Fn.Sub('arn:aws:appsync:${AWS::Region}:${AWS::AccountId}:apis/${GraphQLAPI.ApiId}/*', {})
+      {'Fn::Sub': 'arn:aws:appsync:${AWS::Region}:${AWS::AccountId}:apis/${GraphQLAPI.ApiId}/*'},
     );
 
     // bowenr: removed this because we have WAY too many resources that are protected, and causes CFN template to be *huge*
