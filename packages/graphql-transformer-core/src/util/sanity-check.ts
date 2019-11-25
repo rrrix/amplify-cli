@@ -297,6 +297,9 @@ async function loadDiffableProject(path: string, rootStackName: string): Promise
     root: {},
   };
   for (const key of Object.keys(currentStacks)) {
+    if (!key.endsWith('.json')) {
+      continue;
+    }
     diffableProject.stacks[key] = JSON.parse(project.stacks[key]);
   }
   diffableProject.root = JSON.parse(project[rootStackName]);
