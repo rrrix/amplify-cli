@@ -14,17 +14,38 @@ const { downloadAPIModels } = require('./download-api-models');
 const { loadResourceParameters } = require('../src/resourceParams');
 const { uploadAuthTriggerFiles } = require('./upload-auth-trigger-files');
 const archiver = require('../src/utils/archiver');
+const yaml = require('js-yaml');
+const { spawnSync } = require('child_process');
 
 const spinner = ora('Updating resources in the cloud. This may take a few minutes...');
-const nestedStackFileName = 'nested-cloudformation-stack.yml';
+const nestedStackFileName = 'nested-cloudformation-stack.yaml';
 const optionalBuildDirectoryName = 'build';
 
 async function run(context, resourceDefinition) {
   const { resourcesToBeCreated, resourcesToBeUpdated, resourcesToBeDeleted, allResources } = resourceDefinition;
 
+  if (resourcesToBeCreated.length > 0) {
+    context.print.info('Resources to be Created:');
+    resourcesToBeCreated.forEach(resource => {
+      console.log(yaml.safeDump(resource));
+    });
+  }
+  if (resourcesToBeUpdated.length > 0) {
+    context.print.info('Resources to be Updated:');
+    resourcesToBeUpdated.forEach(resource => {
+      console.log(yaml.safeDump(resource));
+    });
+  }
+  if (resourcesToBeDeleted.length > 0) {
+    context.print.info('Resources to be Deleted:');
+    resourcesToBeDeleted.forEach(resource => {
+      console.log(yaml.safeDump(resource));
+    });
+  }
   const resources = resourcesToBeCreated.concat(resourcesToBeUpdated);
   let projectDetails = context.amplify.getProjectDetails();
 
+  context.print.info('Validating CloudFormation Templates');
   validateCfnTemplates(context, resources);
 
   return packageResources(context, resources)
@@ -36,20 +57,24 @@ async function run(context, resourceDefinition) {
     .then(() => uploadAppSyncFiles(context, resources, allResources))
     .then(() => prePushGraphQLCodegen(context, resourcesToBeCreated, resourcesToBeUpdated))
     .then(() => updateS3Templates(context, resources, projectDetails.amplifyMeta))
+    .then(async () => {
+      const continueToPush = await context.amplify.confirmPrompt.run('Are you sure you want to continue?');
+      if (!continueToPush) {
+        throw new Error('Push canceled');
+      }
+    })
     .then(() => {
+      context.print.info('Updating root stack...');
       spinner.start();
       projectDetails = context.amplify.getProjectDetails();
       if (resources.length > 0 || resourcesToBeDeleted.length > 0) {
-        return updateCloudFormationNestedStack(
-          context,
-          formNestedStack(context, projectDetails),
-          resourcesToBeCreated,
-          resourcesToBeUpdated
-        );
+        const rootStack = formNestedStack(context, projectDetails);
+        return updateCloudFormationNestedStack(context, rootStack, resourcesToBeCreated, resourcesToBeUpdated);
       }
     })
     .then(() => postPushGraphQLCodegen(context))
     .then(async () => {
+      context.print.info('Updating Amplify Metadata...');
       if (resources.length > 0) {
         await context.amplify.updateamplifyMetaAfterPush(resources);
       }
@@ -74,7 +99,7 @@ async function run(context, resourceDefinition) {
       return downloadAPIModels(context, newAPIresources);
     })
     .then(() =>
-      // Store current cloud backend in S3 deployment bcuket
+      // Store current cloud backend in S3 deployment bucket
       storeCurrentCloudBackend(context)
     )
     .then(() => {
@@ -83,6 +108,8 @@ async function run(context, resourceDefinition) {
     })
     .catch(err => {
       spinner.fail('An error occurred when pushing the resources to the cloud');
+      console.log(err.message);
+      console.log(err.stack);
       throw err;
     });
 }
@@ -157,6 +184,7 @@ async function updateStackForAPIMigration(context, category, resourceName, optio
 }
 
 function storeCurrentCloudBackend(context) {
+  context.print.info('Storing #current-cloud-backend.zip in Deployment Bucket...');
   const zipFilename = '#current-cloud-backend.zip';
   const backendDir = context.amplify.pathManager.getBackendDirPath();
   const tempDir = `${backendDir}/.temp`;
@@ -185,28 +213,38 @@ function storeCurrentCloudBackend(context) {
 }
 
 function validateCfnTemplates(context, resourcesToBeUpdated) {
-  for (let i = 0; i < resourcesToBeUpdated.length; i += 1) {
-    const { category, resourceName } = resourcesToBeUpdated[i];
+  const checkCfnLint = spawnSync('command', ['-v', 'cfn-lint'], { env: process.env, shell: true });
+  const hasCfnPythonLint = checkCfnLint.status === 0;
+
+  resourcesToBeUpdated.forEach(resource => {
+    const { category, resourceName } = resource;
     const backEndDir = context.amplify.pathManager.getBackendDirPath();
     const resourceDir = path.normalize(path.join(backEndDir, category, resourceName));
     const files = fs.readdirSync(resourceDir);
     // Fetch all the Cloudformation templates for the resource (can be json or yml)
     const cfnFiles = files.filter(file => file.indexOf('template') !== -1 && file.indexOf('.') !== 0);
-    for (let j = 0; j < cfnFiles.length; j += 1) {
-      const filePath = path.normalize(path.join(resourceDir, cfnFiles[j]));
+    cfnFiles.forEach(cfnFile => {
+      const filePath = path.normalize(path.join(resourceDir, cfnFile));
       try {
         cfnLint.validateFile(filePath);
+        if (hasCfnPythonLint) {
+          const cfnLintCheck = spawnSync('cfn-lint', ['-t', filePath], { env: process.env, shell: true });
+          if (cfnLintCheck.status !== 0) {
+            console.log(cfnLintCheck.output);
+          }
+        }
       } catch (err) {
         context.print.error(`Invalid CloudFormation template: ${filePath}`);
         throw err;
       }
-    }
-  }
+    });
+  });
 }
 
 function packageResources(context, resources) {
   // Only build and package resources which are required
   resources = resources.filter(resource => resource.build);
+  context.print.info(`Packaging resources: ${JSON.stringify(resources, null, 4)}`);
 
   const packageResource = (context, resource) => {
     let s3Key;
@@ -269,6 +307,7 @@ function packageResources(context, resources) {
 }
 
 function updateCloudFormationNestedStack(context, nestedStack, resourcesToBeCreated, resourcesToBeUpdated) {
+  context.print.info(`Updating CloudFormation Nested Stack...`);
   const backEndDir = context.amplify.pathManager.getBackendDirPath();
   const nestedStackFilepath = path.normalize(path.join(backEndDir, providerName, nestedStackFileName));
 
@@ -299,9 +338,9 @@ function updateCloudFormationNestedStack(context, nestedStack, resourcesToBeCrea
   const jsonString = JSON.stringify(nestedStack, null, '\t');
   context.filesystem.write(nestedStackFilepath, jsonString);
 
-  return new Cloudformation(context, userAgentAction).then(cfnItem =>
-    cfnItem.updateResourceStack(path.normalize(path.join(backEndDir, providerName)), nestedStackFileName)
-  );
+  const backEndProviderDir = path.normalize(path.join(backEndDir, providerName));
+  const cfn = new Cloudformation(context, userAgentAction);
+  return cfn.then(cfnItem => cfnItem.updateResourceStack(backEndProviderDir, nestedStackFileName));
 }
 
 function getAllUniqueCategories(resources) {
@@ -340,6 +379,7 @@ function getCfnFiles(context, category, resourceName) {
 function updateS3Templates(context, resourcesToBeUpdated, amplifyMeta) {
   const promises = [];
 
+  context.print.info('Updating S3 Templates...');
   for (let i = 0; i < resourcesToBeUpdated.length; i += 1) {
     const { category, resourceName } = resourcesToBeUpdated[i];
     const { resourceDir, cfnFiles } = getCfnFiles(context, category, resourceName);
@@ -374,14 +414,16 @@ function uploadTemplateToS3(context, resourceDir, cfnFile, category, resourceNam
 /* eslint-disable */
 function formNestedStack(context, projectDetails, categoryName, resourceName, serviceName, skipEnv) {
   /* eslint-enable */
-  const nestedStack = context.amplify.readJsonFile(`${__dirname}/rootStackTemplate.json`);
+  context.print.info(`Building Root Stack...`);
+  const rootStack = context.amplify.readJsonFile(`${__dirname}/rootStackTemplate.json`);
   const { amplifyMeta } = projectDetails;
   let authResourceName;
   let categories = Object.keys(amplifyMeta);
-  categories = categories.filter(category => category !== 'provider');
+  categories = categories.filter(category => category !== 'providers');
   categories.forEach(category => {
     const resources = Object.keys(amplifyMeta[category]);
     resources.forEach(resource => {
+      console.log(`Forming nested stack for ${category}:${resource}`);
       const resourceDetails = amplifyMeta[category][resource];
       if (category === 'auth') {
         authResourceName = resource;
@@ -423,32 +465,38 @@ function formNestedStack(context, projectDetails, categoryName, resourceName, se
 
         if (resourceDetails.providerMetadata) {
           templateURL = resourceDetails.providerMetadata.s3TemplateURL;
-          nestedStack.Resources[resourceKey] = {
+          rootStack.Resources[resourceKey] = {
             Type: 'AWS::CloudFormation::Stack',
             Properties: {
               TemplateURL: templateURL,
               Parameters: parameters,
             },
           };
+        } else {
+          console.log(`Missing providerMetadata for ${category}:${resource}`);
+          throw new Error(`Missing providerMetadata for ${category}:${resource}`);
         }
+      } else if (category !== 'providers') {
+        console.log(`Missing providerPlugin: ${JSON.stringify(resourceDetails)}`);
+        throw new Error(`Missing providerPlugin for ${category}:${resource}`);
       }
     });
   });
 
   if (authResourceName) {
-    updateIdPRolesInNestedStack(context, nestedStack, authResourceName);
+    updateIdPRolesInNestedStack(context, rootStack, authResourceName);
   }
-  return nestedStack;
+  return rootStack;
 }
 
-function updateIdPRolesInNestedStack(context, nestedStack, authResourceName) {
+function updateIdPRolesInNestedStack(context, rootStack, authResourceName) {
   const authLogicalResourceName = `auth${authResourceName}`;
   const idpUpdateRoleCfn = context.amplify.readJsonFile(`${__dirname}/update-idp-roles-cfn.json`);
 
   idpUpdateRoleCfn.UpdateRolesWithIDPFunction.DependsOn.push(authLogicalResourceName);
   idpUpdateRoleCfn.UpdateRolesWithIDPFunctionOutputs.Properties.idpId['Fn::GetAtt'].unshift(authLogicalResourceName);
 
-  Object.assign(nestedStack.Resources, idpUpdateRoleCfn);
+  Object.assign(rootStack.Resources, idpUpdateRoleCfn);
 }
 
 module.exports = {
