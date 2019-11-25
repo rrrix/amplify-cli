@@ -7,8 +7,10 @@ module.exports = {
     } catch (e) {
       if (e.name !== 'InvalidDirectiveError') {
         context.print.error(`An error occured during the push operation: ${e.message}`);
+        console.log(e.stack);
       }
-      process.exit(1);
+      throw e;
+      // process.exit(1);
     }
   },
 };

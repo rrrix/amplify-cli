@@ -15,7 +15,9 @@ async function run(context) {
       if (e.name !== 'InvalidDirectiveError') {
         context.print.error(`An error occured during the push operation: ${e.message}`);
       }
-      process.exit(1);
+      console.log(e.stack);
+      throw e;
+      // process.exit(1);
     }
   }
   process.exit(0);

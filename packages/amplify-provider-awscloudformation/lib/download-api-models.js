@@ -4,6 +4,7 @@ const sequential = require('promise-sequential');
 const APIGateway = require('../src/aws-utils/aws-apigw');
 
 function downloadAPIModels(context, allResources) {
+  context.print.info('Downloading API Models...');
   const { amplify } = context;
   const projectConfig = amplify.getProjectConfig();
 

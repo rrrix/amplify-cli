@@ -146,7 +146,7 @@ async function transformGraphQLSchema(context, options) {
   if (flags['no-gql-override']) {
     return;
   }
-
+  context.print.info('Transforming GraphQL Schema...');
   let { resourceDir, parameters } = options;
   const { forceCompile } = options;
 

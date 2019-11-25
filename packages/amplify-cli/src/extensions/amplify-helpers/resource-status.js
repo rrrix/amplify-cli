@@ -9,8 +9,15 @@ const _ = require('lodash');
 const { readJsonFile } = require('./read-json-file');
 
 async function isBackendDirModifiedSinceLastPush(resourceName, category, lastPushTimeStamp) {
+  const resourceBackendModified = reason => {
+    console.log(`Resource ${resourceName} has been modified: ${reason}`);
+  };
+  const resourceBackendNotModified = reason => {
+    console.log(`Resource ${resourceName} not modified: ${reason}`);
+  };
   // Pushing the resource for the first time hence no lastPushTimeStamp
   if (!lastPushTimeStamp) {
+    resourceBackendNotModified('Last Push Timestamp Matches');
     return false;
   }
 
@@ -19,6 +26,7 @@ async function isBackendDirModifiedSinceLastPush(resourceName, category, lastPus
   const cloudBackendDir = path.normalize(path.join(pathManager.getCurrentCloudBackendDirPath(), category, resourceName));
 
   if (!fs.existsSync(localBackendDir)) {
+    resourceBackendNotModified(`${localBackendDir} does not exist`);
     return false;
   }
 
@@ -26,10 +34,13 @@ async function isBackendDirModifiedSinceLastPush(resourceName, category, lastPus
   const cloudDirHash = await getHashForResourceDir(cloudBackendDir);
 
   if (localDirHash !== cloudDirHash) {
+    resourceBackendModified('Directory checksum mismatch');
     return true;
   }
 
-  return false;
+  // flipping false to true - if none of the conditions above are met, then something else is wrong.
+  resourceBackendModified('Default');
+  return true;
 }
 
 function getHashForResourceDir(dirPath) {

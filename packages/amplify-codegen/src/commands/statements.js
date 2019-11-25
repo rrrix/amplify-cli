@@ -1,11 +1,11 @@
 const path = require('path');
 const fs = require('fs-extra');
 const Ora = require('ora');
-const { generate } = require('amplify-graphql-docs-generator');
+const {generate} = require('amplify-graphql-docs-generator');
 
 const loadConfig = require('../codegen-config');
 const constants = require('../constants');
-const { ensureIntrospectionSchema, getFrontEndHandler, getAppSyncAPIDetails } = require('../utils');
+const {ensureIntrospectionSchema, getFrontEndHandler, getAppSyncAPIDetails} = require('../utils');
 
 async function generateStatements(context, forceDownloadSchema, maxDepth, withoutInit = false, decoupleFrontend = '') {
   try {
@@ -21,7 +21,7 @@ async function generateStatements(context, forceDownloadSchema, maxDepth, withou
   }
   let projectPath = process.cwd();
   if (!withoutInit) {
-    ({ projectPath } = context.amplify.getEnvInfo());
+    ({projectPath} = context.amplify.getEnvInfo());
   }
   if (!projects.length || !apis.length) {
     if (!withoutInit) {
@@ -33,31 +33,36 @@ async function generateStatements(context, forceDownloadSchema, maxDepth, withou
     context.print.info(constants.ERROR_CODEGEN_NO_API_CONFIGURED);
     return;
   }
-  await projects.forEach(async cfg => {
-    const includeFiles = path.join(projectPath, cfg.includes[0]);
-    const opsGenDirectory = cfg.amplifyExtension.docsFilePath
-      ? path.join(projectPath, cfg.amplifyExtension.docsFilePath)
-      : path.dirname(path.dirname(includeFiles));
-    const schemaPath = path.join(projectPath, cfg.schema);
-    let region;
-    let frontend;
-    if (!withoutInit) {
-      ({ region } = cfg.amplifyExtension);
-      await ensureIntrospectionSchema(context, schemaPath, apis[0], region, forceDownloadSchema);
-      frontend = getFrontEndHandler(context);
-    } else {
-      frontend = decoupleFrontend;
-    }
-    const language = frontend === 'javascript' ? cfg.amplifyExtension.codeGenTarget : 'graphql';
-    const opsGenSpinner = new Ora(constants.INFO_MESSAGE_OPS_GEN);
-    opsGenSpinner.start();
-    fs.ensureDirSync(opsGenDirectory);
-    await generate(schemaPath, opsGenDirectory, {
-      separateFiles: true,
-      language,
-      maxDepth: maxDepth || cfg.amplifyExtension.maxDepth,
+  await projects
+    .forEach(async cfg => {
+      const includeFiles = path.join(projectPath, cfg.includes[0]);
+      const opsGenDirectory = cfg.amplifyExtension.docsFilePath
+        ? path.join(projectPath, cfg.amplifyExtension.docsFilePath)
+        : path.dirname(path.dirname(includeFiles));
+      const schemaPath = path.join(projectPath, cfg.schema);
+      let region;
+      let frontend;
+      if (!withoutInit) {
+        ({region} = cfg.amplifyExtension);
+        await ensureIntrospectionSchema(context, schemaPath, apis[0], region, forceDownloadSchema);
+        frontend = getFrontEndHandler(context);
+      } else {
+        frontend = decoupleFrontend;
+      }
+      const language = frontend === 'javascript' ? cfg.amplifyExtension.codeGenTarget : 'graphql';
+      const opsGenSpinner = new Ora(constants.INFO_MESSAGE_OPS_GEN);
+      opsGenSpinner.start();
+      fs.ensureDirSync(opsGenDirectory);
+      await generate(schemaPath, opsGenDirectory, {
+        separateFiles: true,
+        language,
+        maxDepth: maxDepth || cfg.amplifyExtension.maxDepth,
+      });
+      opsGenSpinner.succeed(constants.INFO_MESSAGE_OPS_GEN_SUCCESS + path.relative(path.resolve('.'), opsGenDirectory));
+    })
+    .catch(onRejected => {
+      console.log(`Error performing GraphQL Codegen: ${onRejected}`);
     });
-    opsGenSpinner.succeed(constants.INFO_MESSAGE_OPS_GEN_SUCCESS + path.relative(path.resolve('.'), opsGenDirectory));
-  });
 }
+
 module.exports = generateStatements;

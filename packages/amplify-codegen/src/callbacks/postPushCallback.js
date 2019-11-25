@@ -8,7 +8,7 @@ async function postPushCallback(context, graphQLConfig) {
   if (!graphQLConfig) {
     return;
   }
-
+  context.print.info('Post-Push GraphQL Codegen...');
   if (!graphQLConfig.gqlConfig.schema) {
     const config = loadConfig(context);
     const schemaLocation = getSchemaDownloadLocation(context);
