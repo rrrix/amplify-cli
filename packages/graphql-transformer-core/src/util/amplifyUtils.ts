@@ -1,12 +1,12 @@
 const fs = require('fs-extra');
-const {exec} = require('child_process');
+const { exec } = require('child_process');
 import * as path from 'path';
-import {CloudFormation, Fn, Template} from 'cloudform-types';
-import {DeploymentResources} from '../DeploymentResources';
-import {GraphQLTransform, StackMapping} from '../GraphQLTransform';
-import {ResourceConstants} from 'graphql-transformer-common';
-import {walkDirPosix, readFromPath, writeToPath, throwIfNotJSONExt, emptyDirectory} from './fileUtils';
-import {writeConfig, TransformConfig, TransformMigrationConfig, loadProject, readSchema, loadConfig} from './transformConfig';
+import { CloudFormation, Fn, Template } from 'cloudform-types';
+import { DeploymentResources } from '../DeploymentResources';
+import { GraphQLTransform, StackMapping } from '../GraphQLTransform';
+import { ResourceConstants } from 'graphql-transformer-common';
+import { walkDirPosix, readFromPath, writeToPath, throwIfNotJSONExt, emptyDirectory } from './fileUtils';
+import { writeConfig, TransformConfig, TransformMigrationConfig, loadProject, readSchema, loadConfig } from './transformConfig';
 import * as Sanity from './sanity-check';
 
 export const TRANSFORM_CONFIG_FILE_NAME = `transform.conf.json`;
@@ -89,7 +89,7 @@ function adjustBuildForMigration(resources: DeploymentResources, migrationConfig
     if (resourceIdsToHoist.length === 0) {
       return resources;
     }
-    const resourceIdMap = resourceIdsToHoist.reduce((acc: any, k: string) => ({...acc, [k]: true}), {});
+    const resourceIdMap = resourceIdsToHoist.reduce((acc: any, k: string) => ({ ...acc, [k]: true }), {});
     for (const stackKey of Object.keys(resources.stacks)) {
       const template = resources.stacks[stackKey];
       for (const resourceKey of Object.keys(template.Resources)) {
@@ -120,7 +120,7 @@ function adjustBuildForMigration(resources: DeploymentResources, migrationConfig
  * working without changes.
  */
 async function ensureMissingStackMappings(config: ProjectOptions) {
-  const {currentCloudBackendDirectory} = config;
+  const { currentCloudBackendDirectory } = config;
   let transformOutput = undefined;
 
   if (currentCloudBackendDirectory) {
@@ -138,6 +138,9 @@ async function ensureMissingStackMappings(config: ProjectOptions) {
       // we make a note of it and include it in the missing stack mapping.
       for (const stackFileName of stackNames) {
         const stackName = stackFileName.slice(0, stackFileName.length - path.extname(stackFileName).length);
+        if (!stackName.endsWith('.json')) {
+          continue;
+        }
         const lastDeployedStack = JSON.parse(copyOfCloudBackend.build.stacks[stackFileName]);
         if (lastDeployedStack) {
           const resourceIdsInStack = Object.keys(lastDeployedStack.Resources);
@@ -172,7 +175,7 @@ async function ensureMissingStackMappings(config: ProjectOptions) {
       // If there are missing stack mappings, we write them to disk.
       if (Object.keys(missingStackMappings).length) {
         let conf = await loadConfig(config.projectDirectory);
-        conf = {...conf, StackMapping: {...getOrDefault(conf, 'StackMapping', {}), ...missingStackMappings}};
+        conf = { ...conf, StackMapping: { ...getOrDefault(conf, 'StackMapping', {}), ...missingStackMappings } };
         await writeConfig(config.projectDirectory, conf);
       }
     }
@@ -223,7 +226,7 @@ function mergeUserConfigWithTransformOutput(userConfig: Partial<DeploymentResour
 
   // Load the root stack's parameters as we will update them with the Child Stack's parameters
   // if they are not already present in the root stack.
-  let updatedParameters = rootStack.Parameters;
+  const updatedParameters = rootStack.Parameters;
 
   for (const userStack of Object.keys(userStacks)) {
     if (transformOutput.stacks[userStack]) {
@@ -246,10 +249,9 @@ function mergeUserConfigWithTransformOutput(userConfig: Partial<DeploymentResour
          */
         if (updatedParameters[key]) {
           throw new Error(`Cannot redefine CloudFormation parameter ${key} in stack ${userStack}.`);
-        } else {
-          // Add the entire parameter entry from the user defined stack's parameter
-          updatedParameters[key] = userDefinedStack.Parameters[key];
         }
+        // Add the entire parameter entry from the user defined stack's parameter
+        updatedParameters[key] = userDefinedStack.Parameters[key];
       }
     }
     // Providing a parameter value when the parameters is not explicitly defined
@@ -268,10 +270,10 @@ function mergeUserConfigWithTransformOutput(userConfig: Partial<DeploymentResour
     const stackResourceId = userStack.split(/[^A-Za-z]/).join('');
     const customNestedStack = new CloudFormation.Stack({
       Parameters: parametersForStack,
-      TemplateURL:
-        Fn.Sub(
-          `https://\${${ResourceConstants.PARAMETERS.S3DeploymentBucket}.s3.amazonaws.com/\${${ResourceConstants.PARAMETERS.S3DeploymentRootKey}}/stacks/${userStack}`,
-          {}),
+      TemplateURL: Fn.Sub(`https://\${S3DeploymentBucket}.s3.amazonaws.com/\${S3DeploymentRootKey}/stacks/${userStack}`, {
+        S3DeploymentBucket: { Ref: 'S3DeploymentBucket' },
+        S3DeploymentRootKey: { Ref: 'S3DeploymentRootKey' },
+      }),
       //   Fn.Join('/', [
       //   'https://s3.amazonaws.com',
       //   Fn.Ref(ResourceConstants.PARAMETERS.S3DeploymentBucket),
@@ -306,7 +308,8 @@ export async function uploadDeployment(opts: UploadOptions) {
   try {
     if (!opts.directory) {
       throw new Error(`You must provide a 'directory'`);
-    } else if (!fs.existsSync(opts.directory)) {
+    }
+    if (!fs.existsSync(opts.directory)) {
       throw new Error(`Invalid 'directory': directory does not exist at ${opts.directory}`);
     }
     if (!opts.upload || typeof opts.upload !== 'function') {
@@ -336,7 +339,7 @@ function execAndLog(command: string) {
 
 function flipJsonToYaml(jsonFileName: string) {
   const yamlFileName = jsonFileName.replace('.json', '.yaml');
-  let flipCommand = `cfn-flip --yaml --clean ${jsonFileName} ${yamlFileName}`;
+  const flipCommand = `cfn-flip --yaml --clean ${jsonFileName} ${yamlFileName}`;
   // flipCommand += `&& mv ${jsonFileName} ${jsonFileName}.bak`;
   // flipCommand += `&& mv ${yamlFileName} ${jsonFileName}`;
   execAndLog(flipCommand);
@@ -580,7 +583,7 @@ async function updateToIntermediateProject(projectDirectory: string, project: Am
         break;
       }
       case 'AWS::AppSync::GraphQLSchema':
-        const alteredResource = {...resource};
+        const alteredResource = { ...resource };
         alteredResource.Properties.DefinitionS3Location = {
           'Fn::Sub': [
             's3://${S3DeploymentBucket}/${S3DeploymentRootKey}/schema.graphql',
