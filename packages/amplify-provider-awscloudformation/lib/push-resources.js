@@ -57,12 +57,6 @@ async function run(context, resourceDefinition) {
     .then(() => uploadAppSyncFiles(context, resources, allResources))
     .then(() => prePushGraphQLCodegen(context, resourcesToBeCreated, resourcesToBeUpdated))
     .then(() => updateS3Templates(context, resources, projectDetails.amplifyMeta))
-    .then(async () => {
-      const continueToPush = await context.amplify.confirmPrompt.run('Are you sure you want to continue?');
-      if (!continueToPush) {
-        throw new Error('Push canceled');
-      }
-    })
     .then(() => {
       context.print.info('Updating root stack...');
       spinner.start();

@@ -322,9 +322,9 @@ export async function uploadDeployment(opts: UploadOptions) {
 }
 
 function execAndLog(command: string) {
-  console.log(`exec: ${command}`);
   exec(command, (error, stdout, stderr) => {
     if (error) {
+      console.log(`exec: ${command}`);
       console.error(`exec error: ${error}`);
       return;
     }
@@ -332,6 +332,7 @@ function execAndLog(command: string) {
       console.log(`stdout: ${stdout}`);
     }
     if (stderr) {
+      console.log(`exec: ${command}`);
       console.log(`stderr: ${stderr}`);
     }
   });
@@ -340,14 +341,7 @@ function execAndLog(command: string) {
 function flipJsonToYaml(jsonFileName: string) {
   const yamlFileName = jsonFileName.replace('.json', '.yaml');
   const flipCommand = `cfn-flip --yaml --clean ${jsonFileName} ${yamlFileName}`;
-  // flipCommand += `&& mv ${jsonFileName} ${jsonFileName}.bak`;
-  // flipCommand += `&& mv ${yamlFileName} ${jsonFileName}`;
   execAndLog(flipCommand);
-
-  // const moveCommandOne = `mv ${jsonFileName} ${jsonFileName}.bak`;
-  // execAndLog(moveCommandOne);
-  // const moveCommandTwo = `mv ${yamlFileName} ${jsonFileName}`;
-  // execAndLog(moveCommandTwo);
 }
 
 /**
