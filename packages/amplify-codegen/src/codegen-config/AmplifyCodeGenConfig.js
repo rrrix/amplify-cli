@@ -1,7 +1,7 @@
 const graphQLConfig = require('graphql-config');
-const {join, isAbsolute, relative} = require('path');
+const { join, isAbsolute, relative } = require('path');
 const upath = require('upath');
-const {graphQlToAmplifyConfig} = require('./utils');
+const { graphQlToAmplifyConfig } = require('./utils');
 
 class AmplifyCodeGenConfig {
   constructor(context, withoutInit = false) {
@@ -10,7 +10,7 @@ class AmplifyCodeGenConfig {
       this.fixOldConfig();
     } catch (e) {
       if (e instanceof graphQLConfig.ConfigNotFoundError) {
-        const {amplify} = context;
+        const { amplify } = context;
         let projectRoot;
         if (!withoutInit) {
           projectRoot = amplify.getEnvInfo().projectPath || process.cwd();
@@ -109,7 +109,7 @@ class AmplifyCodeGenConfig {
 
   fixOldConfig() {
     // Older version of config is not a valid graphqlconfig, fix it when loading
-    const {config: cfg} = this.gqlConfig;
+    const { config: cfg } = this.gqlConfig;
     if (cfg.extensions && cfg.extensions.amplify && cfg.extensions.amplify.version >= 3) {
       return;
     }

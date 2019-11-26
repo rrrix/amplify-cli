@@ -1,11 +1,11 @@
 const path = require('path');
 const fs = require('fs-extra');
 const Ora = require('ora');
-const {generate} = require('amplify-graphql-docs-generator');
+const { generate } = require('amplify-graphql-docs-generator');
 
 const loadConfig = require('../codegen-config');
 const constants = require('../constants');
-const {ensureIntrospectionSchema, getFrontEndHandler, getAppSyncAPIDetails} = require('../utils');
+const { ensureIntrospectionSchema, getFrontEndHandler, getAppSyncAPIDetails } = require('../utils');
 
 async function generateStatements(context, forceDownloadSchema, maxDepth, withoutInit = false, decoupleFrontend = '') {
   try {
@@ -21,7 +21,7 @@ async function generateStatements(context, forceDownloadSchema, maxDepth, withou
   }
   let projectPath = process.cwd();
   if (!withoutInit) {
-    ({projectPath} = context.amplify.getEnvInfo());
+    ({ projectPath } = context.amplify.getEnvInfo());
   }
   if (!projects.length || !apis.length) {
     if (!withoutInit) {
@@ -43,7 +43,7 @@ async function generateStatements(context, forceDownloadSchema, maxDepth, withou
       let region;
       let frontend;
       if (!withoutInit) {
-        ({region} = cfg.amplifyExtension);
+        ({ region } = cfg.amplifyExtension);
         await ensureIntrospectionSchema(context, schemaPath, apis[0], region, forceDownloadSchema);
         frontend = getFrontEndHandler(context);
       } else {
