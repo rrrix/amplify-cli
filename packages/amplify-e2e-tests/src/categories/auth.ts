@@ -1,6 +1,4 @@
-import * as nexpect from 'nexpect';
-import { join } from 'path';
-import * as fs from 'fs';
+import * as nexpect from '../utils/nexpect-modified';
 
 import { getCLIPath, isCI, getEnvVars } from '../utils';
 
@@ -15,8 +13,7 @@ export function addAuthWithDefault(cwd: string, settings: any, verbose: boolean 
       .wait('Do you want to configure advanced settings?')
       .sendline('\r')
       .sendEof()
-      // tslint:disable-next-line
-      .run(function(err: Error) {
+      .run((err: Error) => {
         if (!err) {
           resolve();
         } else {
@@ -48,7 +45,7 @@ export function addAuthWithGroupTrigger(cwd: string, settings: any, verbose: boo
       .wait('Do you want to edit your add-to-group function now?')
       .send('n')
       .send('\r')
-      .run(function(err: Error) {
+      .run((err: Error) => {
         if (!err) {
           resolve();
         } else {
@@ -100,7 +97,7 @@ export function addAuthViaAPIWithTrigger(cwd: string, settings: any, verbose: bo
       .wait('Do you want to edit the schema now?')
       .send('n')
       .send('\r')
-      .run(function(err: Error) {
+      .run((err: Error) => {
         if (!err) {
           resolve();
         } else {
@@ -132,6 +129,12 @@ export function addAuthWithCustomTrigger(cwd: string, settings: any, verbose: bo
       .wait('Please provide a name for your user pool:')
       .send('\r')
       .wait('How do you want users to be able to sign in?')
+      .send('\r')
+      .wait('Do you want to add User Pool Groups?')
+      .send('j')
+      .send('\r')
+      .wait('Do you want to add an admin queries API?')
+      .send('j')
       .send('\r')
       .wait('Multifactor authentication (MFA) user login options:')
       .send('\r')
@@ -173,7 +176,7 @@ export function addAuthWithCustomTrigger(cwd: string, settings: any, verbose: bo
       .wait('Do you want to edit your custom function now?')
       .send('n')
       .send('\r')
-      .run(function(err: Error) {
+      .run((err: Error) => {
         if (!err) {
           resolve();
         } else {
@@ -196,6 +199,10 @@ export function updateAuthWithoutCustomTrigger(cwd: string, settings: any, verbo
       .wait('Allow unauthenticated logins?')
       .send('\r')
       .wait('Do you want to enable 3rd party authentication providers in your identity pool?')
+      .send('\r')
+      .wait('Do you want to add User Pool Groups?')
+      .send('\r')
+      .wait('Do you want to add an admin queries API?')
       .send('\r')
       .wait('Multifactor authentication (MFA) user login options:')
       .send('\r')
@@ -223,7 +230,7 @@ export function updateAuthWithoutCustomTrigger(cwd: string, settings: any, verbo
       .send('jjj')
       .send(' ')
       .send('\r')
-      .run(function(err: Error) {
+      .run((err: Error) => {
         if (!err) {
           resolve();
         } else {
@@ -261,7 +268,7 @@ export function addAuthWithRecaptchaTrigger(cwd: string, settings: any, verbose:
       .wait('Do you want to edit your captcha-verify function now?')
       .send('n')
       .send('\r')
-      .run(function(err: Error) {
+      .run((err: Error) => {
         if (!err) {
           resolve();
         } else {
@@ -343,7 +350,7 @@ export function addAuthWithDefaultSocial(cwd: string, settings: any, verbose: bo
       .send(AMAZON_APP_SECRET)
       .send('\r')
       .sendEof()
-      .run(function(err: Error) {
+      .run((err: Error) => {
         if (!err) {
           resolve();
         } else {
@@ -386,6 +393,27 @@ export function addAuthWithMaxOptions(cwd: string, settings: any, verbose: boole
       .wait('Please provide a name for your user pool')
       .send('\r')
       .wait('How do you want users to be able to sign in')
+      .send('\r')
+      .wait('Do you want to add User Pool Groups?')
+      .send('\r')
+      .wait('Provide a name for your user pool group')
+      .send('userPoolGroup1')
+      .send('\r')
+      .wait('Do you want to add another User Pool Group')
+      .send('y')
+      .send('\r')
+      .wait('Provide a name for your user pool group')
+      .send('userPoolGroup2')
+      .send('\r')
+      .wait('Do you want to add another User Pool Group')
+      .send('\r')
+      .wait('Sort the user pool groups in order of preference')
+      .send('\r')
+      .wait('Do you want to add an admin queries API?')
+      .send('\r')
+      .wait('Do you want to restrict access to the admin queries API')
+      .send('\r')
+      .wait('Select the group to restrict access with')
       .send('\r')
       .wait('Multifactor authentication (MFA) user login options')
       .send('j')
@@ -519,7 +547,7 @@ export function addAuthWithMaxOptions(cwd: string, settings: any, verbose: boole
       .send('n')
       .send('\r')
       .sendEof()
-      .run(function(err: Error) {
+      .run((err: Error) => {
         if (!err) {
           resolve();
         } else {

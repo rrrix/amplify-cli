@@ -8,6 +8,7 @@ const providerName = require('./constants').ProviderName;
 const { buildResource } = require('./build-resources');
 const { uploadAppSyncFiles } = require('./upload-appsync-files');
 const { prePushGraphQLCodegen, postPushGraphQLCodegen } = require('./graphql-codegen');
+const { prePushAuthTransform } = require('./auth-transform');
 const { transformGraphQLSchema } = require('./transform-graphql-schema');
 const { displayHelpfulURLs } = require('./display-helpful-urls');
 const { downloadAPIModels } = require('./download-api-models');
@@ -16,13 +17,15 @@ const { uploadAuthTriggerFiles } = require('./upload-auth-trigger-files');
 const archiver = require('../src/utils/archiver');
 const yaml = require('js-yaml');
 const { spawnSync } = require('child_process');
+const amplifyServiceManager = require('./amplify-service-manager');
 
 const spinner = ora('Updating resources in the cloud. This may take a few minutes...');
 const nestedStackFileName = 'nested-cloudformation-stack.yaml';
 const optionalBuildDirectoryName = 'build';
 
 async function run(context, resourceDefinition) {
-  const { resourcesToBeCreated, resourcesToBeUpdated, resourcesToBeDeleted, allResources } = resourceDefinition;
+  try {
+    const { resourcesToBeCreated, resourcesToBeUpdated, resourcesToBeDeleted, allResources } = resourceDefinition;
 
   if (resourcesToBeCreated.length > 0) {
     context.print.info('Resources to be Created:');
@@ -42,70 +45,71 @@ async function run(context, resourceDefinition) {
       console.log(yaml.safeDump(resource));
     });
   }
-  const resources = resourcesToBeCreated.concat(resourcesToBeUpdated);
-  let projectDetails = context.amplify.getProjectDetails();
+    const resources = resourcesToBeCreated.concat(resourcesToBeUpdated);
+    let projectDetails = context.amplify.getProjectDetails();
 
   context.print.info('Validating CloudFormation Templates');
-  validateCfnTemplates(context, resources);
+    validateCfnTemplates(context, resources);
 
-  return packageResources(context, resources)
-    .then(() =>
-      transformGraphQLSchema(context, {
-        handleMigration: opts => updateStackForAPIMigration(context, 'api', undefined, opts),
-      })
-    )
-    .then(() => uploadAppSyncFiles(context, resources, allResources))
-    .then(() => prePushGraphQLCodegen(context, resourcesToBeCreated, resourcesToBeUpdated))
-    .then(() => updateS3Templates(context, resources, projectDetails.amplifyMeta))
-    .then(() => {
-      context.print.info('Updating root stack...');
-      spinner.start();
-      projectDetails = context.amplify.getProjectDetails();
-      if (resources.length > 0 || resourcesToBeDeleted.length > 0) {
-        const rootStack = formNestedStack(context, projectDetails);
-        return updateCloudFormationNestedStack(context, rootStack, resourcesToBeCreated, resourcesToBeUpdated);
+    await packageResources(context, resources);
+
+    await transformGraphQLSchema(context, {
+      handleMigration: opts => updateStackForAPIMigration(context, 'api', undefined, opts),
+    });
+
+    await uploadAppSyncFiles(context, resources, allResources);
+    await prePushAuthTransform(context, resources);
+    await prePushGraphQLCodegen(context, resourcesToBeCreated, resourcesToBeUpdated);
+    await updateS3Templates(context, resources, projectDetails.amplifyMeta);
+    context.print.info('Updating root stack...');
+
+    spinner.start();
+
+    projectDetails = context.amplify.getProjectDetails();
+
+    if (resources.length > 0 || resourcesToBeDeleted.length > 0) {
+      await updateCloudFormationNestedStack(context, formNestedStack(context, projectDetails), resourcesToBeCreated, resourcesToBeUpdated);
+    }
+
+    await postPushGraphQLCodegen(context);
+    await amplifyServiceManager.postPushCheck(context);
+    context.print.info('Updating Amplify Metadata...');
+    if (resources.length > 0) {
+      await context.amplify.updateamplifyMetaAfterPush(resources);
+    }
+
+    for (let i = 0; i < resourcesToBeDeleted.length; i++) {
+      context.amplify.updateamplifyMetaAfterResourceDelete(resourcesToBeDeleted[i].category, resourcesToBeDeleted[i].resourceName);
+    }
+
+    await uploadAuthTriggerFiles(context, resourcesToBeCreated, resourcesToBeUpdated);
+
+    let updatedAllResources = (await context.amplify.getResourceStatus()).allResources;
+
+    const newAPIresources = [];
+
+    updatedAllResources = updatedAllResources.filter(resource => resource.service === 'API Gateway');
+
+    for (let i = 0; i < updatedAllResources.length; i++) {
+      if (resources.findIndex(resource => resource.resourceName === updatedAllResources[i].resourceName) > -1) {
+        newAPIresources.push(updatedAllResources[i]);
       }
-    })
-    .then(() => postPushGraphQLCodegen(context))
-    .then(async () => {
-      context.print.info('Updating Amplify Metadata...');
-      if (resources.length > 0) {
-        await context.amplify.updateamplifyMetaAfterPush(resources);
-      }
-      for (let i = 0; i < resourcesToBeDeleted.length; i += 1) {
-        context.amplify.updateamplifyMetaAfterResourceDelete(resourcesToBeDeleted[i].category, resourcesToBeDeleted[i].resourceName);
-      }
-    })
-    .then(() => uploadAuthTriggerFiles(context, resourcesToBeCreated, resourcesToBeUpdated))
-    .then(async () => {
-      let { allResources } = await context.amplify.getResourceStatus();
+    }
 
-      const newAPIresources = [];
+    await downloadAPIModels(context, newAPIresources);
 
-      allResources = allResources.filter(resource => resource.service === 'API Gateway');
+    // Store current cloud backend in S3 deployment bucket
+    await storeCurrentCloudBackend(context);
+    await amplifyServiceManager.storeArtifactsForAmplifyService(context);
+    spinner.succeed('All resources are updated in the cloud');
 
-      for (let i = 0; i < allResources.length; i += 1) {
-        if (resources.findIndex(resource => resource.resourceName === allResources[i].resourceName) > -1) {
-          newAPIresources.push(allResources[i]);
-        }
-      }
-
-      return downloadAPIModels(context, newAPIresources);
-    })
-    .then(() =>
-      // Store current cloud backend in S3 deployment bucket
-      storeCurrentCloudBackend(context)
-    )
-    .then(() => {
-      spinner.succeed('All resources are updated in the cloud');
-      displayHelpfulURLs(context, resources);
-    })
-    .catch(err => {
-      spinner.fail('An error occurred when pushing the resources to the cloud');
+    displayHelpfulURLs(context, resources);
+  } catch (err) {
+    spinner.fail('An error occurred when pushing the resources to the cloud');
       console.log(err.message);
       console.log(err.stack);
-      throw err;
-    });
+    throw err;
+  }
 }
 
 async function updateStackForAPIMigration(context, category, resourceName, options) {
@@ -300,7 +304,7 @@ function packageResources(context, resources) {
   return Promise.all(promises);
 }
 
-function updateCloudFormationNestedStack(context, nestedStack, resourcesToBeCreated, resourcesToBeUpdated) {
+async function updateCloudFormationNestedStack(context, nestedStack, resourcesToBeCreated, resourcesToBeUpdated) {
   context.print.info(`Updating CloudFormation Nested Stack...`);
   const backEndDir = context.amplify.pathManager.getBackendDirPath();
   const nestedStackFilepath = path.normalize(path.join(backEndDir, providerName, nestedStackFileName));
@@ -332,9 +336,9 @@ function updateCloudFormationNestedStack(context, nestedStack, resourcesToBeCrea
   const jsonString = JSON.stringify(nestedStack, null, '\t');
   context.filesystem.write(nestedStackFilepath, jsonString);
 
-  const backEndProviderDir = path.normalize(path.join(backEndDir, providerName));
-  const cfn = new Cloudformation(context, userAgentAction);
-  return cfn.then(cfnItem => cfnItem.updateResourceStack(backEndProviderDir, nestedStackFileName));
+  const cfnItem = await new Cloudformation(context, userAgentAction);
+
+  await cfnItem.updateResourceStack(path.normalize(path.join(backEndDir, providerName)), nestedStackFileName);
 }
 
 function getAllUniqueCategories(resources) {
@@ -419,7 +423,7 @@ function formNestedStack(context, projectDetails, categoryName, resourceName, se
     resources.forEach(resource => {
       console.log(`Forming nested stack for ${category}:${resource}`);
       const resourceDetails = amplifyMeta[category][resource];
-      if (category === 'auth') {
+      if (category === 'auth' && resource !== 'userPoolGroups') {
         authResourceName = resource;
       }
       const resourceKey = category + resource;
@@ -496,4 +500,5 @@ function updateIdPRolesInNestedStack(context, rootStack, authResourceName) {
 module.exports = {
   run,
   updateStackForAPIMigration,
+  storeCurrentCloudBackend,
 };
