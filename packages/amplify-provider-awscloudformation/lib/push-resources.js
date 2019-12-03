@@ -27,28 +27,28 @@ async function run(context, resourceDefinition) {
   try {
     const { resourcesToBeCreated, resourcesToBeUpdated, resourcesToBeDeleted, allResources } = resourceDefinition;
 
-  if (resourcesToBeCreated.length > 0) {
-    context.print.info('Resources to be Created:');
-    resourcesToBeCreated.forEach(resource => {
-      console.log(yaml.safeDump(resource));
-    });
-  }
-  if (resourcesToBeUpdated.length > 0) {
-    context.print.info('Resources to be Updated:');
-    resourcesToBeUpdated.forEach(resource => {
-      console.log(yaml.safeDump(resource));
-    });
-  }
-  if (resourcesToBeDeleted.length > 0) {
-    context.print.info('Resources to be Deleted:');
-    resourcesToBeDeleted.forEach(resource => {
-      console.log(yaml.safeDump(resource));
-    });
-  }
+    if (resourcesToBeCreated.length > 0) {
+      context.print.info('Resources to be Created:');
+      resourcesToBeCreated.forEach(resource => {
+        console.log(yaml.safeDump(resource));
+      });
+    }
+    if (resourcesToBeUpdated.length > 0) {
+      context.print.info('Resources to be Updated:');
+      resourcesToBeUpdated.forEach(resource => {
+        console.log(yaml.safeDump(resource));
+      });
+    }
+    if (resourcesToBeDeleted.length > 0) {
+      context.print.info('Resources to be Deleted:');
+      resourcesToBeDeleted.forEach(resource => {
+        console.log(yaml.safeDump(resource));
+      });
+    }
     const resources = resourcesToBeCreated.concat(resourcesToBeUpdated);
     let projectDetails = context.amplify.getProjectDetails();
 
-  context.print.info('Validating CloudFormation Templates');
+    context.print.info('Validating CloudFormation Templates');
     validateCfnTemplates(context, resources);
 
     await packageResources(context, resources);
@@ -106,8 +106,8 @@ async function run(context, resourceDefinition) {
     displayHelpfulURLs(context, resources);
   } catch (err) {
     spinner.fail('An error occurred when pushing the resources to the cloud');
-      console.log(err.message);
-      console.log(err.stack);
+    console.log(err.message);
+    console.log(err.stack);
     throw err;
   }
 }

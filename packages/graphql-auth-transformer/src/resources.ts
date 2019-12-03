@@ -37,6 +37,8 @@ import { FieldDefinitionNode } from 'graphql';
 
 import { DEFAULT_OWNER_FIELD, DEFAULT_IDENTITY_FIELD, DEFAULT_GROUPS_FIELD, DEFAULT_GROUP_CLAIM } from './constants';
 import ManagedPolicy from 'cloudform-types/types/iam/managedPolicy';
+import { Error } from 'tslint/lib/error';
+import { Math } from 'cloudform-types/types/ioTAnalytics/pipeline';
 
 function replaceIfUsername(identityClaim: string): string {
   return identityClaim === 'username' ? 'cognito:username' : identityClaim;
@@ -104,7 +106,9 @@ export class ResourceFactory {
     if (apiKeyConfig && apiKeyConfig.apiKeyExpirationDays) {
       expirationDays = apiKeyConfig.apiKeyExpirationDays;
     }
+    // tslint:disable-next-line:no-magic-numbers
     const expirationDateInSeconds = 60 /* s */ * 60 /* m */ * 24 /* h */ * expirationDays; /* d */
+    // tslint:disable-next-line:no-magic-numbers
     const nowEpochTime = Math.floor(Date.now() / 1000);
     return new AppSync.ApiKey({
       ApiId: Fn.GetAtt(ResourceConstants.RESOURCES.GraphQLAPILogicalID, 'ApiId'),
@@ -132,7 +136,7 @@ export class ResourceFactory {
   }
 
   public updateGraphQLAPIWithAuth(apiRecord: GraphQLApi, authConfig: Transformer.AppSyncAuthConfiguration) {
-    let properties: GraphQLApiProperties = {
+    const properties: GraphQLApiProperties = {
       ...apiRecord.Properties,
       Name: apiRecord.Properties.Name,
       AuthenticationType: authConfig.defaultAuthentication.authenticationType,
@@ -311,7 +315,7 @@ export class ResourceFactory {
     if (!rules || rules.length === 0) {
       return comment(`No dynamic group authorization rules for field "${fieldToCheck}"`);
     }
-    let groupAuthorizationExpression: Expression = this.dynamicAuthorizationExpressionForCreate(
+    const groupAuthorizationExpression: Expression = this.dynamicAuthorizationExpressionForCreate(
       rules,
       variableToCheck,
       variableToSet,
@@ -987,7 +991,7 @@ identityClaim: "${rule.identityField || rule.identityClaim || DEFAULT_IDENTITY_F
     const createPolicy = newPolicyResources =>
       new IAM.ManagedPolicy({
         Roles: [
-          //HACK double casting needed because it cannot except Ref
+          // HACK double casting needed because it cannot except Ref
           ({ Ref: `${authPiece}RoleName` } as unknown) as Value<string>,
         ],
         PolicyDocument: {
