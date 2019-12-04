@@ -15,6 +15,7 @@
     "dev-build": "yarn && lerna run build",
     "dev-build-fast": "yarn && lerna run build --parallel",
     "start": "lerna run start --parallel",
+    "watch": "lerna run watch --parallel",
     "link-caa": "cd packages/amplify-app && npm link",
     "link-dev": "cd packages/amplify-cli && ln -s $(pwd)/bin/amplify $(yarn global bin)/amplify-dev && cd -",
     "rm-dev-link": "rm -f $(yarn global bin)/amplify-dev",
@@ -56,15 +57,15 @@
     "@commitlint/cli": "^8.1.0",
     "@commitlint/config-conventional": "^8.1.0",
     "@commitlint/config-lerna-scopes": "^8.1.0",
+    "codecov": "^3.6.1",
     "commitizen": "^3.1.2",
     "cz-conventional-changelog": "^3.0.2",
-    "husky": "^3.0.3",
-    "codecov": "^3.6.1",
     "eslint-config-prettier": "^6.3.0",
     "eslint-plugin-prettier": "^3.1.0",
+    "husky": "^3.0.3",
+    "pretty-quick": "^1.11.1",
     "tslint-config-prettier": "^1.18.0",
-    "tslint-plugin-prettier": "^2.0.1",
-    "pretty-quick": "^1.11.1"
+    "tslint-plugin-prettier": "^2.0.1"
   },
   "config": {
     "commitizen": {
