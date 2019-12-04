@@ -15,6 +15,7 @@
     "bottleneck": "2.16.2",
     "cfn-lint": "^1.7.2",
     "chalk": "^2.4.2",
+    "cloudformation-schema-js-yaml": "^1.0.1",
     "columnify": "^1.5.4",
     "extract-zip": "^1.6.7",
     "folder-hash": "^2.0.0",
