@@ -15,11 +15,10 @@ module.exports = {
       return await context.amplify.pushResources(context);
     } catch (e) {
       if (e.name !== 'InvalidDirectiveError') {
-        context.print.error(`An error occured during the push operation: ${e.message}`);
-        console.log(e.stack);
+        context.print.error(`An error occurred during the push operation: ${e.message}`);
       }
+      console.error(e.stack);
       throw e;
-      // process.exit(1);
     }
   },
 };
@@ -52,6 +51,7 @@ async function syncCurrentCloudBackend(context) {
     spinner.succeed(`Successfully pulled backend environment ${currentEnv} from the cloud.`);
   } catch (e) {
     spinner.fail(`There was an error pulling the backend environment ${currentEnv}.`);
+    console.error(e.stack);
     throw e;
   }
 }

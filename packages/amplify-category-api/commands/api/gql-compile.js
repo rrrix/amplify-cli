@@ -7,6 +7,7 @@ module.exports = {
       await context.amplify.executeProviderUtils(context, 'awscloudformation', 'compileSchema', { forceCompile: true });
     } catch (err) {
       context.print.error(err.toString());
+      context.print.error(err.stack);
     }
   },
 };
