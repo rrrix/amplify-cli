@@ -24,6 +24,8 @@
     "no-unused-variable": false,
     "no-use-before-declare": true,
     "no-var-requires": false,
+    "no-shadowed-variable": false,
+    "no-magic-numbers": false,
     "one-line": [true, "check-open-brace", "check-catch", "check-else", "check-whitespace"],
     "semicolon": false,
     "triple-equals": [true, "allow-null-check"],
