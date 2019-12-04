@@ -16,7 +16,7 @@ const { loadResourceParameters } = require('../src/resourceParams');
 const { uploadAuthTriggerFiles } = require('./upload-auth-trigger-files');
 const archiver = require('../src/utils/archiver');
 const yaml = require('js-yaml');
-const { spawnSync } = require('child_process');
+const { spawnSync, exec } = require('child_process');
 const amplifyServiceManager = require('./amplify-service-manager');
 
 const spinner = ora('Updating resources in the cloud. This may take a few minutes...');
@@ -105,9 +105,9 @@ async function run(context, resourceDefinition) {
 
     displayHelpfulURLs(context, resources);
   } catch (err) {
-    spinner.fail('An error occurred when pushing the resources to the cloud');
-    console.log(err.message);
     console.log(err.stack);
+    console.log(err.message);
+    spinner.fail('An error occurred when pushing the resources to the cloud');
     throw err;
   }
 }
@@ -224,8 +224,12 @@ function validateCfnTemplates(context, resourcesToBeUpdated) {
     cfnFiles.forEach(cfnFile => {
       const filePath = path.normalize(path.join(resourceDir, cfnFile));
       try {
-        cfnLint.validateFile(filePath);
+        if (filePath.endsWith('.json')) {
+          console.log(`Validating ${filePath} with cfn-lint (js)`);
+          cfnLint.validateFile(filePath);
+        }
         if (hasCfnPythonLint) {
+          console.log(`Validating ${filePath} with cfn-lint (python)`);
           const cfnLintCheck = spawnSync('cfn-lint', ['-t', filePath], { env: process.env, shell: true });
           if (cfnLintCheck.status !== 0) {
             console.log(cfnLintCheck.output);
@@ -266,17 +270,15 @@ function packageResources(context, resources) {
 
         const files = fs.readdirSync(resourceDir);
         // Fetch all the Cloudformation templates for the resource (can be json or yml)
-        const cfnFiles = files.filter(file => file.indexOf('template') !== -1 && /\.(json|yaml|yml)$/.test(file));
-
-        if (cfnFiles.length !== 1) {
-          context.print.error('Only one CloudFormation template is allowed in the resource directory');
-          context.print.error(resourceDir);
-          throw new Error('Only one CloudFormation template is allowed in the resource directory');
+        let cfnFiles = files.filter(file => file.indexOf('template') !== -1 && /\.(yaml)$/.test(file));
+        if (cfnFiles.length === 0) {
+          cfnFiles = files.filter(file => file.indexOf('template') !== -1 && /\.(json)$/.test(file));
         }
 
         const cfnFile = cfnFiles[0];
-        const cfnFilePath = path.normalize(path.join(resourceDir, cfnFile));
+        let cfnFilePath = path.normalize(path.join(resourceDir, cfnFile));
 
+        console.log(`Reading CFN File ${cfnFilePath}...`);
         const cfnMeta = context.amplify.readJsonFile(cfnFilePath);
 
         if (cfnMeta.Resources.LambdaFunction.Type === 'AWS::Serverless::Function') {
@@ -291,8 +293,17 @@ function packageResources(context, resources) {
           };
         }
 
-        const jsonString = JSON.stringify(cfnMeta, null, '\t');
-        fs.writeFileSync(cfnFilePath, jsonString, 'utf8');
+        // const jsonString = JSON.stringify(cfnMeta, null, 4);
+        // console.log(`Writing JSON: ${cfnFilePath}`);
+        // fs.writeFileSync(cfnFilePath, jsonString, 'utf8');
+
+        if (cfnFilePath.endsWith('.json')) {
+          fs.remove(cfnFilePath);
+          cfnFilePath = cfnFile.replace('.json', '.yaml');
+        }
+        const yamlString = yaml.safeDump(cfnMeta);
+        console.log(`Writing YAML: ${cfnFilePath}`);
+        fs.writeFileSync(cfnFilePath, yamlString, 'utf8');
       });
   };
 
@@ -333,7 +344,9 @@ async function updateCloudFormationNestedStack(context, nestedStack, resourcesTo
     });
   }
 
-  const jsonString = JSON.stringify(nestedStack, null, '\t');
+  //  const jsonString = JSON.stringify(nestedStack, null, '\t');
+  const jsonString = yaml.safeDump(nestedStack);
+  console.log(`Writing YAML: ${nestedStackFilepath}`);
   context.filesystem.write(nestedStackFilepath, jsonString);
 
   const cfnItem = await new Cloudformation(context, userAgentAction);
@@ -382,11 +395,44 @@ function updateS3Templates(context, resourcesToBeUpdated, amplifyMeta) {
     const { category, resourceName } = resourcesToBeUpdated[i];
     const { resourceDir, cfnFiles } = getCfnFiles(context, category, resourceName);
     for (let j = 0; j < cfnFiles.length; j += 1) {
-      promises.push(uploadTemplateToS3(context, resourceDir, cfnFiles[j], category, resourceName, amplifyMeta));
+      const cfnFile = cfnFiles[j];
+      const filePath = path.normalize(path.join(resourceDir, cfnFile));
+
+      if (cfnFile.endsWith('.json')) {
+        const yamlCfnFile = filePath.replace('.json', '.yaml');
+        if (!fs.existsSync(yamlCfnFile)) {
+          flipJsonToYaml(filePath);
+          promises.push(uploadTemplateToS3(context, resourceDir, yamlCfnFile, category, resourceName, amplifyMeta));
+        }
+      }
+      promises.push(uploadTemplateToS3(context, resourceDir, cfnFile, category, resourceName, amplifyMeta));
     }
   }
 
   return Promise.all(promises);
+}
+
+function execAndLog(command) {
+  exec(command, (error, stdout, stderr) => {
+    if (error) {
+      console.log(`exec: ${command}`);
+      console.error(`exec error: ${error}`);
+      return;
+    }
+    if (stdout) {
+      console.log(`stdout: ${stdout}`);
+    }
+    if (stderr) {
+      console.log(`exec: ${command}`);
+      console.log(`stderr: ${stderr}`);
+    }
+  });
+}
+
+function flipJsonToYaml(jsonFileName) {
+  const yamlFileName = jsonFileName.replace('.json', '.yaml');
+  const flipCommand = `cfn-flip --yaml --clean ${jsonFileName} ${yamlFileName}`;
+  execAndLog(flipCommand);
 }
 
 function uploadTemplateToS3(context, resourceDir, cfnFile, category, resourceName, amplifyMeta) {
@@ -463,6 +509,11 @@ function formNestedStack(context, projectDetails, categoryName, resourceName, se
 
         if (resourceDetails.providerMetadata) {
           templateURL = resourceDetails.providerMetadata.s3TemplateURL;
+          if (templateURL.endsWith('.json')) {
+            templateURL = templateURL.replace('.json', '.yaml');
+            resourceDetails.providerMetadata.s3TemplateURL = templateURL;
+          }
+          console.log(`Adding nested stack ${templateURL}`);
           rootStack.Resources[resourceKey] = {
             Type: 'AWS::CloudFormation::Stack',
             Properties: {

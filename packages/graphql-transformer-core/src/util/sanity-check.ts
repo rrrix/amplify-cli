@@ -5,6 +5,7 @@ import { readFromPath } from './fileUtils';
 import { InvalidMigrationError } from '../errors';
 import { Template } from 'cloudform-types';
 import { TRANSFORM_CONFIG_FILE_NAME } from '..';
+const yaml = require('js-yaml');
 
 interface Diff {
   kind: 'N' | 'E' | 'D' | 'A';
@@ -298,12 +299,12 @@ async function loadDiffableProject(path: string, rootStackName: string): Promise
     root: {},
   };
   for (const key of Object.keys(currentStacks)) {
-    if (!key.endsWith('.json')) {
+    if (!key.endsWith('.json') && !key.endsWith('.yaml')) {
       continue;
     }
-    diffableProject.stacks[key] = JSON.parse(project.stacks[key]);
+    diffableProject.stacks[key] = yaml.safeLoad(project.stacks[key]);
   }
-  diffableProject.root = JSON.parse(project[rootStackName]);
+  diffableProject.root = yaml.safeLoad(project[rootStackName]);
   return diffableProject;
 }
 

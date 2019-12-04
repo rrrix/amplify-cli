@@ -3,6 +3,7 @@ import { Template } from 'cloudform-types';
 import { throwIfNotJSONExt } from './fileUtils';
 import { ProjectOptions } from './amplifyUtils';
 const fs = require('fs-extra');
+const yaml = require('js-yaml');
 
 export const TRANSFORM_CONFIG_FILE_NAME = `transform.conf.json`;
 export const TRANSFORM_BASE_VERSION = 4;
@@ -172,7 +173,7 @@ export async function loadProject(projectDirectory: string, opts?: ProjectOption
       throwIfNotJSONExt(stackFile);
       const stackBuffer = await fs.readFile(stackFilePath);
       try {
-        stacks[stackFile] = JSON.parse(stackBuffer.toString());
+        stacks[stackFile] = yaml.safeLoad(stackBuffer.toString());
       } catch (e) {
         throw new Error(`The CloudFormation template ${stackFiles} does not contain valid JSON.`);
       }

@@ -33,10 +33,11 @@ async function run(context) {
     stackName = verifiedStackName;
     const authRoleName = `${stackName}-authRole`;
     const unauthRoleName = `${stackName}-unauthRole`;
+    const templateBody = context.amplify.readJsonFile(initTemplateFilePath);
     const params = {
       StackName: stackName,
       Capabilities: ['CAPABILITY_NAMED_IAM', 'CAPABILITY_AUTO_EXPAND'],
-      TemplateBody: fs.readFileSync(initTemplateFilePath).toString(),
+      TemplateBody: templateBody,
       Parameters: [
         {
           ParameterKey: 'DeploymentBucketName',

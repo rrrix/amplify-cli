@@ -1,4 +1,6 @@
 const fs = require('fs-extra');
+const yaml = require('js-yaml');
+const schema = require('cloudformation-schema-js-yaml');
 
 function stripBOM(content) {
   if (content.charCodeAt(0) === 0xfeff) {
@@ -8,7 +10,7 @@ function stripBOM(content) {
 }
 
 function readJsonFile(jsonFilePath, encoding = 'utf8') {
-  return JSON.parse(stripBOM(fs.readFileSync(jsonFilePath, encoding)));
+  return yaml.safeLoad(stripBOM(fs.readFileSync(jsonFilePath, encoding)), { schema });
 }
 
 module.exports = {

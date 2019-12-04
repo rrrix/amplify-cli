@@ -1,6 +1,7 @@
 const fs = require('fs');
 const fsext = require('fs-extra');
 const path = require('path');
+const yaml = require('js-yaml');
 
 const TransformPackage = require('graphql-transformer-core');
 // const S3 = require('../src/aws-utils/aws-s3');
@@ -156,7 +157,7 @@ async function uploadAppSyncFiles(context, resourcesToUpdate, allResources, opti
     const cfFilePath = path.join(backEndDir, category, resourceName, 'build', CF_FILE_NAME);
     try {
       const cfFileContents = fs.readFileSync(cfFilePath).toString();
-      const cfTemplateJson = JSON.parse(cfFileContents);
+      const cfTemplateJson = yaml.safeLoad(cfFileContents);
       const paramKeys = Object.keys(currentParameters);
       for (let keyIndex = 0; keyIndex < paramKeys.length; keyIndex++) {
         const paramKey = paramKeys[keyIndex];
@@ -166,6 +167,7 @@ async function uploadAppSyncFiles(context, resourcesToUpdate, allResources, opti
       }
     } catch (e) {
       context.print.warning(`Could not read cloudformation template at path: ${cfFilePath}`);
+      context.print.error(e.stack);
     }
 
     const jsonString = JSON.stringify(currentParameters, null, 4);
@@ -201,19 +203,12 @@ async function uploadAppSyncFiles(context, resourcesToUpdate, allResources, opti
     const s3target = `s3://${projectBucket}/${deploymentRootKey}/`;
     const s3SyncResult = spawnSync('aws', ['s3', 'sync', resourceBuildDir, s3target], awscliOptions);
 
-    context.print.info(s3SyncResult.output);
-    if (s3SyncResult.status === 0) {
-      context.print.info(s3SyncResult.output);
-    } else {
-      context.print.error(s3SyncResult.output);
+    if (s3SyncResult.stdout) {
+      context.print.info(s3SyncResult.stdout.toString());
     }
-    // const { stdout, stderr } = await exec(awsS3SyncCommand, awscliOptions);
-    // if (stdout) {
-    //   context.print.info(stdout);
-    // }
-    // if (stderr) {
-    //   context.print.error(stderr);
-    // }
+    if (s3SyncResult.stderr) {
+      context.print.error(s3SyncResult.stderr.toString());
+    }
   }
 
   // eslint-disable-next-line no-unused-vars

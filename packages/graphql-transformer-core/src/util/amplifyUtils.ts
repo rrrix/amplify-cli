@@ -8,7 +8,7 @@ import { ResourceConstants } from 'graphql-transformer-common';
 import { walkDirPosix, readFromPath, writeToPath, throwIfNotJSONExt, emptyDirectory } from './fileUtils';
 import { writeConfig, TransformConfig, TransformMigrationConfig, loadProject, readSchema, loadConfig } from './transformConfig';
 import * as Sanity from './sanity-check';
-
+const yaml = require('js-yaml');
 const CLOUDFORMATION_FILE_NAME = 'cloudformation-template.json';
 const PARAMETERS_FILE_NAME = 'parameters.json';
 
@@ -141,7 +141,7 @@ async function ensureMissingStackMappings(config: ProjectOptions) {
         if (!stackName.endsWith('.json')) {
           continue;
         }
-        const lastDeployedStack = JSON.parse(copyOfCloudBackend.build.stacks[stackFileName]);
+        const lastDeployedStack = yaml.safeLoad(copyOfCloudBackend.build.stacks[stackFileName]);
         if (lastDeployedStack) {
           const resourceIdsInStack = Object.keys(lastDeployedStack.Resources);
           for (const resourceId of resourceIdsInStack) {
@@ -159,7 +159,7 @@ async function ensureMissingStackMappings(config: ProjectOptions) {
       }
 
       // We then do the same thing with the root stack.
-      const lastDeployedStack = JSON.parse(copyOfCloudBackend.build[config.rootStackFileName]);
+      const lastDeployedStack = yaml.safeLoad(copyOfCloudBackend.build[config.rootStackFileName]);
       const resourceIdsInStack = Object.keys(lastDeployedStack.Resources);
       for (const resourceId of resourceIdsInStack) {
         if (stackMapping[resourceId] && 'root' !== stackMapping[resourceId]) {
@@ -322,6 +322,7 @@ export async function uploadDeployment(opts: UploadOptions) {
 }
 
 function execAndLog(command: string) {
+  console.log(command);
   exec(command, (error, stdout, stderr) => {
     if (error) {
       console.log(`exec: ${command}`);
@@ -481,7 +482,7 @@ export async function readV1ProjectConfiguration(projectDirectory: string): Prom
     throw new Error(`Could not find cloudformation template at ${cloudFormationTemplatePath}`);
   }
   const cloudFormationTemplateStr = await fs.readFile(cloudFormationTemplatePath);
-  const cloudFormationTemplate = JSON.parse(cloudFormationTemplateStr.toString());
+  const cloudFormationTemplate = yaml.safeLoad(cloudFormationTemplateStr.toString());
 
   // Get the params
   const parametersFilePath = path.join(projectDirectory, 'parameters.json');
@@ -490,7 +491,7 @@ export async function readV1ProjectConfiguration(projectDirectory: string): Prom
     throw new Error(`Could not find parameters.json at ${parametersFilePath}`);
   }
   const parametersFileStr = await fs.readFile(parametersFilePath);
-  const parametersFile = JSON.parse(parametersFileStr.toString());
+  const parametersFile = yaml.safeLoad(parametersFileStr.toString());
 
   return {
     template: cloudFormationTemplate,

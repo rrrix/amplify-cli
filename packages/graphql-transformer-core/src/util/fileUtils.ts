@@ -116,7 +116,8 @@ export async function walkDirPosix(dir: string, handler: (file: { Key: string; B
 export function throwIfNotJSONExt(stackFile: string) {
   const extension = path.extname(stackFile);
   if (extension === '.yaml' || extension === '.yml') {
-    throw new Error(`Yaml is not yet supported. Please convert the CloudFormation stack ${stackFile} to json.`);
+    return;
+    // throw new Error(`Yaml is not yet supported. Please convert the CloudFormation stack ${stackFile} to json.`);
   }
   if (extension !== '.json') {
     throw new Error(`Invalid extension ${extension} for stack ${stackFile}`);
