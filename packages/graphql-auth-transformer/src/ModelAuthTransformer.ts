@@ -279,7 +279,7 @@ export class ModelAuthTransformer extends Transformer {
         }),
       });
 
-      const authPolicies = this.resources.makeIAMPolicyForRole(true, this.authPolicyResources);
+      const authPolicies = this.resources.makeSimpleIAMPolicyForRole(true, this.authPolicyResources);
 
       for (let i = 0; i < authPolicies.length; i++) {
         const paddedIndex = `${i + 1}`.padStart(2, '0');
@@ -302,7 +302,7 @@ export class ModelAuthTransformer extends Transformer {
         }),
       });
 
-      const unauthPolicies = this.resources.makeIAMPolicyForRole(false, this.unauthPolicyResources);
+      const unauthPolicies = this.resources.makeSimpleIAMPolicyForRole(false, this.unauthPolicyResources);
 
       for (let i = 0; i < unauthPolicies.length; i++) {
         const paddedIndex = `${i + 1}`.padStart(2, '0');

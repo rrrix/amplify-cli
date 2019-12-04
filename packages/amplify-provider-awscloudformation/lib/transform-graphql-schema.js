@@ -419,7 +419,7 @@ async function transformGraphQLSchema(context, options) {
       new HttpTransformer(),
       new KeyTransformer(),
       new ModelConnectionTransformer(),
-      new PredictionsTransformer(storageConfig),
+      // new PredictionsTransformer(storageConfig),
     ];
 
     if (addSearchableTransformer) {
