@@ -86,7 +86,7 @@ export async function handleFile(handler: FileHandler, key: string, body: Buffer
     throw e;
   }
 }
-async function asyncForEach(array, callback) {
+async function asyncForEach(array: Array<any>, callback: Function) {
   for (let index = 0; index < array.length; index += 1) {
     await callback(array[index], index, array);
   }
