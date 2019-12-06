@@ -14,7 +14,7 @@
     "production-build-fast": "yarn --frozen-lockfile && lerna run build --parallel",
     "dev-build": "yarn && lerna run build",
     "dev-build-fast": "yarn && lerna run build --parallel",
-    "cd-build": "lerna run build --parallel --ignore '*graphiql*' --ignore '*simulator*' --ignore '*tests*' --ignore '*mock*'",
+    "cd-build": "lerna run build --ignore '*graphiql*' --ignore '*simulator*' --ignore '*tests*' --ignore '*mock*'",
     "start": "lerna run start --parallel",
     "watch": "lerna run watch --parallel",
     "link-caa": "cd packages/amplify-app && npm link",

@@ -6,6 +6,7 @@ import { InvalidMigrationError } from '../errors';
 import { Template } from 'cloudform-types';
 import { TRANSFORM_CONFIG_FILE_NAME } from '..';
 const yaml = require('js-yaml');
+const schema = require('cloudformation-schema-js-yaml');
 
 interface Diff {
   kind: 'N' | 'E' | 'D' | 'A';
@@ -302,9 +303,9 @@ async function loadDiffableProject(path: string, rootStackName: string): Promise
     if (!key.endsWith('.json') && !key.endsWith('.yaml')) {
       continue;
     }
-    diffableProject.stacks[key] = yaml.safeLoad(project.stacks[key]);
+    diffableProject.stacks[key] = yaml.safeLoad(project.stacks[key], { schema });
   }
-  diffableProject.root = yaml.safeLoad(project[rootStackName]);
+  diffableProject.root = yaml.safeLoad(project[rootStackName], { schema });
   return diffableProject;
 }
 

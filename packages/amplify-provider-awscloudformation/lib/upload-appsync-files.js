@@ -2,6 +2,7 @@ const fs = require('fs');
 const fsext = require('fs-extra');
 const path = require('path');
 const yaml = require('js-yaml');
+const schema = require('cloudformation-schema-js-yaml');
 
 const TransformPackage = require('graphql-transformer-core');
 // const S3 = require('../src/aws-utils/aws-s3');
@@ -157,7 +158,7 @@ async function uploadAppSyncFiles(context, resourcesToUpdate, allResources, opti
     const cfFilePath = path.join(backEndDir, category, resourceName, 'build', CF_FILE_NAME);
     try {
       const cfFileContents = fs.readFileSync(cfFilePath).toString();
-      const cfTemplateJson = yaml.safeLoad(cfFileContents);
+      const cfTemplateJson = yaml.safeLoad(cfFileContents, { schema });
       const paramKeys = Object.keys(currentParameters);
       for (let keyIndex = 0; keyIndex < paramKeys.length; keyIndex++) {
         const paramKey = paramKeys[keyIndex];
