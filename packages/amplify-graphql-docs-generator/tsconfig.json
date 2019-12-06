@@ -7,12 +7,12 @@
         "experimentalDecorators": true,
         "emitDecoratorMetadata": true,
         "sourceRoot": "src",
-        "lib": [
-            "es2017",
-            "dom",
-            "esnext.asynciterable",
-            "dom"
-        ],
+//        "lib": [
+//            "es2017",
+//            "dom",
+//            "esnext.asynciterable",
+//            "dom"
+//        ],
         "declaration": true
     },
     "exclude": [

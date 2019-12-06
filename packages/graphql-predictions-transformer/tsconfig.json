@@ -4,13 +4,13 @@
         "module": "commonjs",
         "sourceMap": true,
         "outDir": "lib",
-        "lib": [
-            "ESNext",
-            "es2015",
-            "es2016.array.include",
-            "esnext.asynciterable",
-            "dom"
-        ],
+//        "lib": [
+//            "ESNext",
+//            "es2015",
+//            "es2016.array.include",
+//            "esnext.asynciterable",
+//            "dom"
+//        ],
         "declaration": true
     },
     "exclude": [

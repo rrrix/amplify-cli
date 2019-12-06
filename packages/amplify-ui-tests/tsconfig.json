@@ -7,12 +7,12 @@
         "rootDir": "./src",
         "types": ["jest"],
         "outDir": "lib",
-        "lib": [
-            "es2015",
-            "es2016.array.include",
-            "esnext.asynciterable",
-            "dom"
-        ],
+//        "lib": [
+//            "es2015",
+//            "es2016.array.include",
+//            "esnext.asynciterable",
+//            "dom"
+//        ],
         "allowJs": true
     },
     "exclude": [

@@ -4,11 +4,11 @@
         "module": "commonjs",
         "sourceMap": true,
         "outDir": "lib",
-        "lib": [
-            "es2016.array.include",
-            "esnext.asynciterable",
-            "dom"
-        ],
+//        "lib": [
+//            "es2016.array.include",
+//            "esnext.asynciterable",
+//            "dom"
+//        ],
         "declaration": true
     },
     "exclude": [

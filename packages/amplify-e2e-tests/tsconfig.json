@@ -1,13 +1,13 @@
 {
   "compilerOptions": {
     "skipLibCheck": true,
-    "target": "es5",
+    "target": "ESNext",
     "module": "commonjs",
     "sourceMap": true,
     "rootDir": "./src",
     "types": ["jest"],
     "outDir": "lib",
-    "lib": ["es2015", "es2016.array.include", "esnext.asynciterable", "dom"],
+    // "lib": ["es2015", "es2016.array.include", "esnext.asynciterable", "dom"],
     "declaration": true,
     "typeRoots": ["node_modules/@types", "./typings"]
   },
