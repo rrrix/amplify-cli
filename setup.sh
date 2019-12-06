@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-yarn global upgrade yarn@latest lerna@latest
+yarn global upgrade yarn@latest npm@latest
 yarn global add lerna typescript eslint tslint jest
 yarn config set workspaces-experimental true
 yarn run setup-cli
