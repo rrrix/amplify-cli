@@ -188,11 +188,12 @@ async function uploadAppSyncFiles(context, resourcesToUpdate, allResources, opti
 
     const configuration = await configurationManager.loadConfiguration(context);
 
+
     // console.log(JSON.stringify(configuration, null, 4));
     const awscliOptions = {
       env: {
         ...process.env,
-        AWS_DEFAULT_REGION: configuration.region,
+        AWS_DEFAULT_REGION: configuration.region || process.env.AWS_DEFAULT_REGION || '',
         AWS_ACCESS_KEY_ID: configuration.accessKeyId,
         AWS_SECRET_ACCESS_KEY: configuration.secretAccessKey,
         AWS_SESSION_TOKEN: configuration.sessionToken,
