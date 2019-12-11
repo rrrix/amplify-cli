@@ -33,11 +33,10 @@ async function run(context) {
     stackName = verifiedStackName;
     const authRoleName = `${stackName}-authRole`;
     const unauthRoleName = `${stackName}-unauthRole`;
-    const templateBody = context.amplify.readJsonFile(initTemplateFilePath);
     const params = {
       StackName: stackName,
       Capabilities: ['CAPABILITY_NAMED_IAM', 'CAPABILITY_AUTO_EXPAND'],
-      TemplateBody: templateBody,
+      TemplateBody: fs.readFileSync(initTemplateFilePath).toString(),
       Parameters: [
         {
           ParameterKey: 'DeploymentBucketName',
@@ -54,6 +53,7 @@ async function run(context) {
       ],
     };
 
+    console.log(JSON.stringify(params, null, 2));
     const spinner = ora();
     spinner.start('Initializing project in the cloud...');
     return new Cloudformation(context, 'init', awsConfig)
@@ -65,6 +65,7 @@ async function run(context) {
       })
       .catch(e => {
         spinner.fail('Root stack creation failed');
+        console.log(e.stack);
         throw e;
       });
   }
