@@ -21,7 +21,7 @@ async function awsCliS3Sync(context, resourceBuildDir, deploymentRootKey) {
   const awscliOptions = {
     env: {
       ...process.env,
-      AWS_DEFAULT_REGION: configuration.region || process.env.AWS_DEFAULT_REGION,
+      AWS_DEFAULT_REGION: configuration.region || process.env.AWS_DEFAULT_REGION || aws.config.region,
       AWS_ACCESS_KEY_ID: configuration.accessKeyId,
       AWS_SECRET_ACCESS_KEY: configuration.secretAccessKey,
       AWS_SESSION_TOKEN: configuration.sessionToken,
