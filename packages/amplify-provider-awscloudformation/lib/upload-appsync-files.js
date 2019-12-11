@@ -14,7 +14,7 @@ const { hashElement } = require('folder-hash');
 const PARAM_FILE_NAME = 'parameters.json';
 const CF_FILE_NAME = 'cloudformation-template.json';
 
-const configurationManager = require('../lib/configuration-manager');
+const awsCli = require('../src/aws-utils/aws-cli');
 
 function getProjectBucket(context) {
   const projectDetails = context.amplify.getProjectDetails();
@@ -178,41 +178,6 @@ async function uploadAppSyncFiles(context, resourcesToUpdate, allResources, opti
     fs.writeFileSync(parametersOutputFilePath, jsonString, 'utf8');
   };
 
-  async function awsCliS3Sync(resourceBuildDir, deploymentRootKey) {
-    const { spawnSync } = require('child_process');
-    const projectDetails = context.amplify.getProjectDetails();
-    const { envName } = context.amplify.getEnvInfo();
-    const projectBucket = projectDetails.amplifyMeta.providers
-      ? projectDetails.amplifyMeta.providers[providerName].DeploymentBucketName
-      : projectDetails.teamProviderInfo[envName][providerName].DeploymentBucketName;
-
-    const configuration = await configurationManager.loadConfiguration(context);
-
-
-    // console.log(JSON.stringify(configuration, null, 4));
-    const awscliOptions = {
-      env: {
-        ...process.env,
-        AWS_DEFAULT_REGION: configuration.region || process.env.AWS_DEFAULT_REGION || '',
-        AWS_ACCESS_KEY_ID: configuration.accessKeyId,
-        AWS_SECRET_ACCESS_KEY: configuration.secretAccessKey,
-        AWS_SESSION_TOKEN: configuration.sessionToken,
-      },
-    };
-    // We're going to use the AWS CLI to copy files, as it's highly optimized for this task
-    const awsS3SyncCommand = `aws s3 sync ${resourceBuildDir} s3://${projectBucket}/${deploymentRootKey}/`;
-    context.print.info(`Using AWS CLI for S3 transfer: ${awsS3SyncCommand}`);
-    const s3target = `s3://${projectBucket}/${deploymentRootKey}/`;
-    const s3SyncResult = spawnSync('aws', ['s3', 'sync', resourceBuildDir, s3target], awscliOptions);
-
-    if (s3SyncResult.stdout) {
-      context.print.info(s3SyncResult.stdout.toString());
-    }
-    if (s3SyncResult.stderr) {
-      context.print.error(s3SyncResult.stderr.toString());
-    }
-  }
-
   // eslint-disable-next-line no-unused-vars
   async function uploadApiProject(resourceBuildDir, deploymentRootKey, s3Client) {
     await TransformPackage.uploadAPIProject({
@@ -245,7 +210,8 @@ async function uploadAppSyncFiles(context, resourcesToUpdate, allResources, opti
       context.print.warning(`Warning: resourceBuildDir ${resourceBuildDir} not found!`);
       return;
     }
-    await awsCliS3Sync(resourceBuildDir, deploymentRootKey);
+    await awsCli.awsCliS3Sync(context, resourceBuildDir, deploymentRootKey);
+
     // const s3Client = await new S3(context);
     // await uploadApiProject(resourceBuildDir, deploymentRootKey, s3Client);
   } else if (allApiResources.length > 0) {

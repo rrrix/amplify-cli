@@ -1,6 +1,7 @@
 const path = require('path');
 const fs = require('fs-extra');
 const chalk = require('chalk');
+const aws = require('aws-sdk');
 const inquirer = require('inquirer');
 const proxyAgent = require('proxy-agent');
 const awsRegions = require('./aws-regions');
@@ -457,6 +458,13 @@ function getConfigForEnv(context, envName) {
           throw new Error(`Corrupt file contents in ${configInfoFilePath}`);
         }
         projectConfigInfo.configLevel = 'project';
+      } else {
+        // FIX: If configLevel == general, then this didn't happen... and it needs to!
+        const { accessKeyId, secretAccessKey, sessionToken } = aws.config.credentials;
+        projectConfigInfo.config.accessKeyId = accessKeyId;
+        projectConfigInfo.config.secretAccessKey = secretAccessKey;
+        projectConfigInfo.config.sessionToken = sessionToken;
+        projectConfigInfo.config.region = aws.config.region;
       }
     } catch (e) {
       throw e;
@@ -491,8 +499,7 @@ function removeProjectConfig(context) {
 
 async function loadConfiguration(context) {
   const { envName } = context.amplify.getEnvInfo();
-  const config = await loadConfigurationForEnv(context, envName);
-  return config;
+  return await loadConfigurationForEnv(context, envName);
 }
 function loadConfigFromPath(context, profilePath) {
   if (fs.existsSync(profilePath)) {
