@@ -3,11 +3,9 @@ const chalk = require('chalk');
 module.exports = {
   name: 'get',
   run: async context => {
-    const envName = context.parameters.options.name;
-    if (!envName) {
-      context.print.error('You must pass in the name of the environment using the --name flag');
-      process.exit(1);
-    }
+    const envInfo = context.amplify.getEnvInfo();
+    const envName = context.parameters.options.name || envInfo.envName;
+
     let envFound = false;
     const allEnvs = context.amplify.getEnvDetails();
 
