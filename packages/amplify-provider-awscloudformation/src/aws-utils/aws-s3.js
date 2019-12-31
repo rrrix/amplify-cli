@@ -25,11 +25,19 @@ class S3 {
       ? projectDetails.amplifyMeta.providers[providerName].DeploymentBucketName
       : projectDetails.teamProviderInfo[envName][providerName].DeploymentBucketName;
     s3Params.Bucket = projectBucket;
-    console.log(`s3.PutObject(s3://${s3Params.Bucket}/${s3Params.Key})`);
+    const s3key = `s3.PutObject(s3://${s3Params.Bucket}/${s3Params.Key})`;
+    console.log(s3key);
     return this.s3
       .upload(s3Params)
       .promise()
-      .then(() => projectBucket);
+      .then(() => {
+        this.context.print.info(`Finished ${s3key}`);
+        return projectBucket;
+      })
+      .catch(reason => {
+        this.context.print.error(`Error uploading s3://${s3Params.Bucket}/${s3Params.Key}: ${reason.toString()}`);
+        throw reason;
+      });
   }
 
   getFile(s3Params, envName = this.context.amplify.getEnvInfo().envName) {

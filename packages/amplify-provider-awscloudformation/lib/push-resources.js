@@ -16,7 +16,9 @@ const { loadResourceParameters } = require('../src/resourceParams');
 const { uploadAuthTriggerFiles } = require('./upload-auth-trigger-files');
 const archiver = require('../src/utils/archiver');
 const yaml = require('js-yaml');
-const { spawnSync, exec } = require('child_process');
+const { spawnSync } = require('child_process');
+const util = require('util');
+const exec = util.promisify(require('child_process').exec);
 const amplifyServiceManager = require('./amplify-service-manager');
 
 const spinner = ora('Updating resources in the cloud. This may take a few minutes...');
@@ -49,7 +51,7 @@ async function run(context, resourceDefinition) {
     let projectDetails = context.amplify.getProjectDetails();
 
     context.print.info('Validating CloudFormation Templates');
-    validateCfnTemplates(context, resources);
+    await validateCfnTemplates(context, resources);
 
     await packageResources(context, resources);
 
@@ -61,14 +63,16 @@ async function run(context, resourceDefinition) {
     await prePushAuthTransform(context, resources);
     await prePushGraphQLCodegen(context, resourcesToBeCreated, resourcesToBeUpdated);
     await updateS3Templates(context, resources, projectDetails.amplifyMeta);
+
+    // Generate CFN Templates
+    projectDetails = context.amplify.getProjectDetails();
+    const rootStack = buildRootStack(context, projectDetails);
+
     context.print.info('Updating root stack...');
 
     spinner.start();
-
-    projectDetails = context.amplify.getProjectDetails();
-
     if (resources.length > 0 || resourcesToBeDeleted.length > 0) {
-      await updateCloudFormationNestedStack(context, formNestedStack(context, projectDetails), resourcesToBeCreated, resourcesToBeUpdated);
+      await updateCloudFormationNestedStack(context, rootStack, resourcesToBeCreated, resourcesToBeUpdated);
     }
 
     await postPushGraphQLCodegen(context);
@@ -103,11 +107,12 @@ async function run(context, resourceDefinition) {
     await amplifyServiceManager.storeArtifactsForAmplifyService(context);
     spinner.succeed('All resources are updated in the cloud');
 
-    displayHelpfulURLs(context, resources);
+    await displayHelpfulURLs(context, resources);
   } catch (err) {
     console.log(err.stack);
     console.log(err.message);
     spinner.fail('An error occurred when pushing the resources to the cloud');
+    process.exitCode = 1;
     throw err;
   }
 }
@@ -123,7 +128,7 @@ async function updateStackForAPIMigration(context, category, resourceName, optio
   let resources = resourcesToBeCreated.concat(resourcesToBeUpdated);
   let projectDetails = context.amplify.getProjectDetails();
 
-  validateCfnTemplates(context, resources);
+  await validateCfnTemplates(context, resources);
 
   resources = allResources.filter(resource => resource.service === 'AppSync');
 
@@ -157,11 +162,11 @@ async function updateStackForAPIMigration(context, category, resourceName, optio
         if (isReverting && isCLIMigration) {
           // When this is a CLI migration and we are rolling back, we do not want to inject
           // an [env] for any templates.
-          nestedStack = formNestedStack(context, projectDetails, category, resourceName, 'AppSync', true);
+          nestedStack = buildRootStack(context, projectDetails, category, resourceName, 'AppSync', true);
         } else if (isCLIMigration) {
-          nestedStack = formNestedStack(context, projectDetails, category, resourceName, 'AppSync');
+          nestedStack = buildRootStack(context, projectDetails, category, resourceName, 'AppSync');
         } else {
-          nestedStack = formNestedStack(context, projectDetails, category);
+          nestedStack = buildRootStack(context, projectDetails, category);
         }
         return updateCloudFormationNestedStack(context, nestedStack, resourcesToBeCreated, resourcesToBeUpdated);
       }
@@ -188,9 +193,8 @@ function storeCurrentCloudBackend(context) {
   const tempDir = `${backendDir}/.temp`;
   const currentCloudBackendDir = context.amplify.pathManager.getCurrentCloudBackendDirPath();
 
-  if (!fs.existsSync(tempDir)) {
-    fs.mkdirSync(tempDir);
-  }
+  // noinspection JSUnresolvedFunction
+  fs.mkdirpSync(tempDir);
 
   const zipFilePath = path.normalize(path.join(tempDir, zipFilename));
   return archiver
@@ -205,114 +209,134 @@ function storeCurrentCloudBackend(context) {
         return s3.uploadFile(s3Params);
       });
     })
-    .then(() => {
-      fs.removeSync(tempDir);
-    });
+    .then(fs.remove(tempDir));
 }
 
-function validateCfnTemplates(context, resourcesToBeUpdated) {
+async function validateCfnTemplates(context, resourcesToBeUpdated) {
   const checkCfnLint = spawnSync('command', ['-v', 'cfn-lint'], { env: process.env, shell: true });
   const hasCfnPythonLint = checkCfnLint.status === 0;
 
-  resourcesToBeUpdated.forEach(resource => {
-    const { category, resourceName } = resource;
-    const backEndDir = context.amplify.pathManager.getBackendDirPath();
-    const resourceDir = path.normalize(path.join(backEndDir, category, resourceName));
-    const files = fs.readdirSync(resourceDir);
-    // Fetch all the Cloudformation templates for the resource (can be json or yml)
-    const cfnFiles = files.filter(file => file.indexOf('template') !== -1 && file.indexOf('.') !== 0);
-    cfnFiles.forEach(cfnFile => {
+  const validateTemplateFile = resourceDir => {
+    const lintJsonFile = filePath => {
+      if (filePath.endsWith('.json')) {
+        console.log(`Validating ${filePath} with cfn-lint (js)`);
+        cfnLint.validateFile(filePath);
+      }
+    };
+
+    return async cfnFile => {
       const filePath = path.normalize(path.join(resourceDir, cfnFile));
       try {
-        if (filePath.endsWith('.json')) {
-          console.log(`Validating ${filePath} with cfn-lint (js)`);
-          cfnLint.validateFile(filePath);
-        }
+        lintJsonFile(filePath);
         if (hasCfnPythonLint) {
           console.log(`Validating ${filePath} with cfn-lint (python)`);
-          const cfnLintCheck = spawnSync('cfn-lint', ['-t', filePath], { env: process.env, shell: true });
-          if (cfnLintCheck.status !== 0) {
-            console.log(cfnLintCheck.output);
+          const cfnLintCheck = exec(`cfn-lint -t ${filePath}`, {
+            cwd: process.cwd(),
+          });
+          // const cfnLintCheck = spawnSync('cfn-lint', ['-t', filePath], { env: process.env, shell: true });
+          if (cfnLintCheck.stdout) {
+            console.log(cfnLintCheck.stdout.toString());
           }
         }
       } catch (err) {
         context.print.error(`Invalid CloudFormation template: ${filePath}`);
         throw err;
       }
-    });
+    };
+  };
+
+  const validateResourceTemplates = () => async resource => {
+    const { category, resourceName } = resource;
+    const backEndDir = context.amplify.pathManager.getBackendDirPath();
+    const resourceDir = path.normalize(path.join(backEndDir, category, resourceName));
+    const files = fs.readdirSync(resourceDir);
+    // Fetch all the Cloudformation templates for the resource (can be json or yml)
+    const cfnFiles = files.filter(file => file.indexOf('template') !== -1 && file.indexOf('.') !== 0);
+    await Promise.all(cfnFiles.map(validateTemplateFile(resourceDir)));
+  };
+
+  await Promise.all(resourcesToBeUpdated.map(validateResourceTemplates())).catch(reason => {
+    console.log(`Template validation failed: ${reason}`);
+    throw reason;
   });
 }
 
 function packageResources(context, resources) {
-  // Only build and package resources which are required
-  resources = resources.filter(resource => resource.build);
-  context.print.info(`Packaging resources: ${JSON.stringify(resources, null, 4)}`);
+  try {
+    // Only build and package resources which are required
+    resources = resources.filter(resource => resource.build);
+    context.print.info(`Packaging resources: ${yaml.safeDump(resources)}`);
 
-  const packageResource = (context, resource) => {
-    let s3Key;
-    return buildResource(context, resource)
-      .then(result => {
-        // Upload zip file to S3
-        s3Key = `amplify-builds/${result.zipFilename}`;
-        return new S3(context).then(s3 => {
-          const s3Params = {
-            Body: fs.createReadStream(result.zipFilePath),
-            Key: s3Key,
-          };
-          return s3.uploadFile(s3Params);
+    const packageResource = (context, resource) => {
+      let s3Key;
+      return buildResource(context, resource)
+        .then(result => {
+          // Upload zip file to S3
+          s3Key = `amplify-builds/${result.zipFilename}`;
+          return new S3(context).then(s3 => {
+            const s3Params = {
+              Body: fs.createReadStream(result.zipFilePath),
+              Key: s3Key,
+            };
+            return s3.uploadFile(s3Params);
+          });
+        })
+        .then(s3Bucket => {
+          // Update cfn template
+          const { category, resourceName } = resource;
+          const backEndDir = context.amplify.pathManager.getBackendDirPath();
+          const resourceDir = path.normalize(path.join(backEndDir, category, resourceName));
+
+          const files = fs.readdirSync(resourceDir);
+          // Fetch all the Cloudformation templates for the resource (can be json or yml)
+          let cfnFiles = files.filter(file => file.indexOf('template') !== -1 && /\.(yaml)$/.test(file));
+          if (cfnFiles.length === 0) {
+            cfnFiles = files.filter(file => file.indexOf('template') !== -1 && /\.(json)$/.test(file));
+          }
+
+          const cfnFile = cfnFiles[0];
+          let cfnFilePath = path.normalize(path.join(resourceDir, cfnFile));
+
+          console.log(`Reading CFN File ${cfnFilePath}...`);
+          const cfnMeta = context.amplify.readJsonFile(cfnFilePath);
+
+          if (cfnMeta.Resources.LambdaFunction.Type === 'AWS::Serverless::Function') {
+            cfnMeta.Resources.LambdaFunction.Properties.CodeUri = {
+              Bucket: s3Bucket,
+              Key: s3Key,
+            };
+          } else {
+            cfnMeta.Resources.LambdaFunction.Properties.Code = {
+              S3Bucket: s3Bucket,
+              S3Key: s3Key,
+            };
+          }
+
+          // const jsonString = JSON.stringify(cfnMeta, null, 4);
+          // console.log(`Writing JSON: ${cfnFilePath}`);
+          // fs.writeFileSync(cfnFilePath, jsonString, 'utf8');
+
+          if (cfnFilePath.endsWith('.json')) {
+            fs.removeSync(cfnFilePath);
+            cfnFilePath = cfnFilePath.replace('.json', '.yaml');
+          }
+          const yamlString = yaml.safeDump(cfnMeta);
+          console.log(`Writing Lambda Function YAML Stack: ${cfnFilePath}`);
+          fs.writeFileSync(cfnFilePath, yamlString, 'utf8');
         });
-      })
-      .then(s3Bucket => {
-        // Update cfn template
-        const { category, resourceName } = resource;
-        const backEndDir = context.amplify.pathManager.getBackendDirPath();
-        const resourceDir = path.normalize(path.join(backEndDir, category, resourceName));
+    };
 
-        const files = fs.readdirSync(resourceDir);
-        // Fetch all the Cloudformation templates for the resource (can be json or yml)
-        let cfnFiles = files.filter(file => file.indexOf('template') !== -1 && /\.(yaml)$/.test(file));
-        if (cfnFiles.length === 0) {
-          cfnFiles = files.filter(file => file.indexOf('template') !== -1 && /\.(json)$/.test(file));
-        }
+    const promises = [];
+    for (let i = 0; i < resources.length; i += 1) {
+      promises.push(packageResource(context, resources[i]));
+    }
 
-        const cfnFile = cfnFiles[0];
-        let cfnFilePath = path.normalize(path.join(resourceDir, cfnFile));
-
-        console.log(`Reading CFN File ${cfnFilePath}...`);
-        const cfnMeta = context.amplify.readJsonFile(cfnFilePath);
-
-        if (cfnMeta.Resources.LambdaFunction.Type === 'AWS::Serverless::Function') {
-          cfnMeta.Resources.LambdaFunction.Properties.CodeUri = {
-            Bucket: s3Bucket,
-            Key: s3Key,
-          };
-        } else {
-          cfnMeta.Resources.LambdaFunction.Properties.Code = {
-            S3Bucket: s3Bucket,
-            S3Key: s3Key,
-          };
-        }
-
-        // const jsonString = JSON.stringify(cfnMeta, null, 4);
-        // console.log(`Writing JSON: ${cfnFilePath}`);
-        // fs.writeFileSync(cfnFilePath, jsonString, 'utf8');
-
-        if (cfnFilePath.endsWith('.json')) {
-          fs.remove(cfnFilePath);
-          cfnFilePath = cfnFile.replace('.json', '.yaml');
-        }
-        const yamlString = yaml.safeDump(cfnMeta);
-        console.log(`Writing YAML: ${cfnFilePath}`);
-        fs.writeFileSync(cfnFilePath, yamlString, 'utf8');
-      });
-  };
-
-  const promises = [];
-  for (let i = 0; i < resources.length; i += 1) {
-    promises.push(packageResource(context, resources[i]));
+    return Promise.all(promises);
+  } catch (e) {
+    console.log(`Error while packaging resources`);
+    console.log(e.stack);
+    throw e;
   }
-
-  return Promise.all(promises);
 }
 
 async function updateCloudFormationNestedStack(context, nestedStack, resourcesToBeCreated, resourcesToBeUpdated) {
@@ -346,7 +370,7 @@ async function updateCloudFormationNestedStack(context, nestedStack, resourcesTo
 
   //  const jsonString = JSON.stringify(nestedStack, null, '\t');
   const jsonString = yaml.safeDump(nestedStack);
-  console.log(`Writing YAML: ${nestedStackFilepath}`);
+  console.log(`Writing YAML for Nested Stack: ${nestedStackFilepath}`);
   context.filesystem.write(nestedStackFilepath, jsonString);
 
   const cfnItem = await new Cloudformation(context, userAgentAction);
@@ -455,9 +479,7 @@ function uploadTemplateToS3(context, resourceDir, cfnFile, category, resourceNam
     });
 }
 
-/* eslint-disable */
-function formNestedStack(context, projectDetails, categoryName, resourceName, serviceName, skipEnv) {
-  /* eslint-enable */
+function buildRootStack(context, projectDetails, categoryName, resourceName, serviceName, skipEnv) {
   context.print.info(`Building Root Stack...`);
   const rootStack = context.amplify.readJsonFile(`${__dirname}/rootStackTemplate.json`);
   const { amplifyMeta } = projectDetails;

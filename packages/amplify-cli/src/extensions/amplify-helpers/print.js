@@ -61,7 +61,7 @@ function table(data, options = {}) {
       t.push(...data);
     }
   }
-  console.log(t.toString());
+  console.log(`\n${t.toString()}`);
 }
 
 function columnHeaderDivider(cliTable) {

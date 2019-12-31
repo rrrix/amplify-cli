@@ -76,6 +76,7 @@ function validateKeyFieldConnectionWithKey(field: FieldDefinitionNode, ctx: Tran
   if (!isAList && isNonNull && isAScalarOrEnum) {
     return;
   }
+  console.log(`field: ${JSON.stringify(field)}, isAList: ${isAList}, isNonNull: ${isNonNull}, isAScalarOrEnum: ${isAScalarOrEnum}`);
   throw new InvalidDirectiveError(`All fields provided to an @connection must be non-null scalar or enum fields.`);
 }
 

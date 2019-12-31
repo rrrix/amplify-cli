@@ -427,6 +427,7 @@ async function transformGraphQLSchema(context, options) {
     currentCloudBackendDirectory: previouslyDeployedBackendDir,
     disableResolverOverrides: options.disableResolverOverrides,
   };
+  context.print.info(`Building API Project...`);
   const transformerOutput = await TransformPackage.buildAPIProject(buildConfig);
 
   context.print.success(`\nGraphQL schema compiled successfully.\n\nEdit your schema at ${schemaFilePath} or \

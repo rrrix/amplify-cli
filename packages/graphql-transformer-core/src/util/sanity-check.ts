@@ -1,4 +1,5 @@
 const fs = require('fs-extra');
+const util = require('util');
 import { basename } from 'path';
 import { diff as getDiffs } from 'deep-diff';
 import { readFromPath } from './fileUtils';
@@ -26,8 +27,8 @@ export async function check(
   buildDirectory: string,
   rootStackName: string = 'cloudformation-template.json'
 ) {
-  const cloudBackendDirectoryExists = await fs.exists(currentCloudBackendDir);
-  const buildDirectoryExists = await fs.exists(buildDirectory);
+  const cloudBackendDirectoryExists = await fs.pathExists(currentCloudBackendDir);
+  const buildDirectoryExists = await fs.pathExists(buildDirectory);
 
   // Diff rules rule on a single Diff.
   const diffRules: DiffRule[] = [
@@ -67,9 +68,7 @@ type ProjectRule = (diffs: Diff[], currentBuild: DiffableProject, nextBuild: Dif
 /**
  * Throws a helpful error when a customer is trying to complete an invalid migration.
  * Users are unable to update a KeySchema after the table has been deployed.
- * @param diffs The set of diffs between currentBuild and nextBuild.
- * @param currentBuild The last deployed build.
- * @param nextBuild The next build.
+ * @param diff The set of diffs between currentBuild and nextBuild.
  */
 export function cantEditKeySchema(diff: Diff) {
   if (diff.kind === 'E' && diff.path.length === 8 && diff.path[5] === 'KeySchema') {
@@ -87,9 +86,7 @@ export function cantEditKeySchema(diff: Diff) {
 /**
  * Throws a helpful error when a customer is trying to complete an invalid migration.
  * Users are unable to add LSIs after the table has been created.
- * @param diffs The set of diffs between currentBuild and nextBuild.
- * @param currentBuild The last deployed build.
- * @param nextBuild The next build.
+ * @param diff The set of diffs between currentBuild and nextBuild.
  */
 export function cantAddLSILater(diff: Diff) {
   if (
@@ -113,7 +110,7 @@ export function cantAddLSILater(diff: Diff) {
 /**
  * Throws a helpful error when a customer is trying to complete an invalid migration.
  * Users are unable to change GSI KeySchemas after they are created.
- * @param diffs The set of diffs between currentBuild and nextBuild.
+ * @param diff The set of diffs between currentBuild and nextBuild.
  * @param currentBuild The last deployed build.
  * @param nextBuild The next build.
  */
@@ -144,7 +141,7 @@ export function cantEditGSIKeySchema(diff: Diff, currentBuild: DiffableProject, 
     const innerDiffs = getDiffs(oldIndexesDiffable, newIndexesDiffable);
     // We must look at this inner diff or else we could confuse a situation
     // where the user adds a GSI to the beginning of the GlobalSecondaryIndexes list in CFN.
-    // We re-key the indexes list so we can determine if a change occured to an index that
+    // We re-key the indexes list so we can determine if a change occurred to an index that
     // already exists.
     for (const innerDiff of innerDiffs) {
       // path: ["AGSI","KeySchema",0,"AttributeName"]
@@ -167,7 +164,7 @@ export function cantEditGSIKeySchema(diff: Diff, currentBuild: DiffableProject, 
 /**
  * Throws a helpful error when a customer is trying to complete an invalid migration.
  * Users are unable to add and remove GSIs at the same time.
- * @param diffs The set of diffs between currentBuild and nextBuild.
+ * @param diff The set of diffs between currentBuild and nextBuild.
  * @param currentBuild The last deployed build.
  * @param nextBuild The next build.
  */
@@ -206,9 +203,13 @@ export function cantAddAndRemoveGSIAtSameTime(diff: Diff, currentBuild: Diffable
         sawNew = true;
       }
     }
-    if (sawDelete && sawNew) {
+    const deleteAndNew = sawDelete && sawNew;
+    const moreThanTwoIndexChanges = Math.abs(oldIndexes.length - newIndexes.length) >= 2;
+    if (deleteAndNew || moreThanTwoIndexChanges) {
       const stackName = basename(diff.path[1], '.json');
       const tableName = diff.path[3];
+      console.log(`sawNew: ${sawNew} sawDelete: ${sawDelete}`);
+      console.log(`innerDiffs: ${util.inspect(innerDiffs, { depth: null })}`);
       throwError(stackName, tableName);
     }
   }
@@ -217,7 +218,7 @@ export function cantAddAndRemoveGSIAtSameTime(diff: Diff, currentBuild: Diffable
 /**
  * Throws a helpful error when a customer is trying to complete an invalid migration.
  * Users are unable to change LSI KeySchemas after they are created.
- * @param diffs The set of diffs between currentBuild and nextBuild.
+ * @param diff The set of diffs between currentBuild and nextBuild.
  * @param currentBuild The last deployed build.
  * @param nextBuild The next build.
  */
@@ -238,7 +239,7 @@ export function cantEditLSIKeySchema(diff: Diff, currentBuild: DiffableProject, 
     const innerDiffs = getDiffs(oldIndexesDiffable, newIndexesDiffable);
     // We must look at this inner diff or else we could confuse a situation
     // where the user adds a LSI to the beginning of the LocalSecondaryIndex list in CFN.
-    // We re-key the indexes list so we can determine if a change occured to an index that
+    // We re-key the indexes list so we can determine if a change occurred to an index that
     // already exists.
     for (const innerDiff of innerDiffs) {
       // path: ["AGSI","KeySchema",0,"AttributeName"]

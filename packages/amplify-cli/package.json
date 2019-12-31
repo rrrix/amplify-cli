@@ -17,6 +17,7 @@
     "postinstall": "node scripts/post-install.js",
     "build": "tsc",
     "start": "tsc -w",
+    "watch": "tsc -w",
     "clean": "rm -rf ./lib"
   },
   "engines": {
@@ -49,6 +50,8 @@
     "cli-table3": "^0.5.1",
     "cloudformation-schema-js-yaml": "^1.0.1",
     "colors": "^1.3.3",
+    "console-inject": "^1.0.8",
+    "date-fns": "^2.8.1",
     "ejs": "^2.6.2",
     "env-editor": "^0.4.0",
     "esm": "^3.2.25",
@@ -66,6 +69,7 @@
     "open": "^6.4.0",
     "optionator": "^0.8.2",
     "ora": "^3.4.0",
+    "pretty-error": "^2.1.1",
     "promise-sequential": "^1.1.1",
     "util": "^0.12.1",
     "which": "^1.3.1",

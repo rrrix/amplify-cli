@@ -6,6 +6,7 @@ const os = require('os');
 const inquirer = require('inquirer');
 const constants = require('./constants');
 const proxyAgent = require('proxy-agent');
+const { differenceInMinutes, parseISO } = require('date-fns');
 
 const dotAWSDirPath = path.normalize(path.join(os.homedir(), '.aws'));
 const credentialsFilePath = path.join(dotAWSDirPath, 'credentials');
@@ -92,11 +93,13 @@ async function getProfiledAwsConfig(context, profileName, isRoleSourceProfile) {
   return awsConfig;
 }
 
+// eslint-disable-next-line no-unused-vars
 async function getRoleCredentials(context, profileName, profileConfig) {
   const roleSessionName = profileConfig.role_session_name || 'amplify';
   let roleCredentials = getCachedRoleCredentials(context, profileConfig.role_arn, roleSessionName);
 
   if (!roleCredentials) {
+    context.print.info(`Credentials for profile ${profileName} are missing or expired, refreshing credentials...`);
     const sourceProfileAwsConfig = profileConfig.source_profile
       ? await getProfiledAwsConfig(context, profileConfig.source_profile, true)
       : {};
@@ -156,6 +159,9 @@ async function getMfaTokenCode() {
 }
 
 function cacheRoleCredentials(context, roleArn, sessionName, credentials) {
+  const now = new Date();
+  const expiresInMinutes = differenceInMinutes(credentials.expiration, now);
+  context.print.info(`Caching credentials for role ${roleArn}, expires in ${expiresInMinutes} minutes`);
   let cacheContents = {};
   const cacheFilePath = getCacheFilePath(context);
   if (fs.existsSync(cacheFilePath)) {
@@ -175,6 +181,13 @@ function getCachedRoleCredentials(context, roleArn, sessionName) {
     if (cacheContents[roleArn]) {
       roleCredentials = cacheContents[roleArn][sessionName];
       roleCredentials = validateCachedCredentials(roleCredentials) ? roleCredentials : undefined;
+
+      if (roleCredentials) {
+        const now = new Date();
+        const expiration = parseISO(roleCredentials.expiration);
+        const expiresInMinutes = differenceInMinutes(expiration, now);
+        context.print.info(`Found valid cached credentials for ${roleArn}, expires in ${expiresInMinutes} minutes`);
+      }
     }
   }
   return roleCredentials;
@@ -198,10 +211,10 @@ function isCredentialsExpired(roleCredentials) {
   let isExpired = true;
 
   if (roleCredentials && roleCredentials.expiration) {
-    const TOTAL_MILLISECONDS_IN_ONE_MINUTE = 1000 * 60;
+    const MAX_INTERVAL_MINUTES = 30;
     const now = new Date();
     const expirationDate = new Date(roleCredentials.expiration);
-    isExpired = expirationDate - now < TOTAL_MILLISECONDS_IN_ONE_MINUTE;
+    isExpired = differenceInMinutes(expirationDate, now) < MAX_INTERVAL_MINUTES;
   }
 
   return isExpired;

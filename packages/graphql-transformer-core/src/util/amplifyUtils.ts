@@ -1,13 +1,15 @@
 const fs = require('fs-extra');
-const { exec } = require('child_process');
+const { promisify } = require('util');
+const exec = promisify(require('child_process').exec);
 import * as path from 'path';
 import { CloudFormation, Fn, Template } from 'cloudform-types';
 import { DeploymentResources } from '../DeploymentResources';
 import { GraphQLTransform, StackMapping } from '../GraphQLTransform';
 import { ResourceConstants } from 'graphql-transformer-common';
-import { walkDirPosix, readFromPath, writeToPath, throwIfNotJSONExt, emptyDirectory } from './fileUtils';
-import { writeConfig, TransformConfig, TransformMigrationConfig, loadProject, readSchema, loadConfig } from './transformConfig';
+import { emptyDirectory, readFromPath, throwIfNotJSONExt, walkDirPosix, writeToPath } from './fileUtils';
+import { loadConfig, loadProject, readSchema, TransformConfig, TransformMigrationConfig, writeConfig } from './transformConfig';
 import * as Sanity from './sanity-check';
+
 const yaml = require('js-yaml');
 const schema = require('cloudformation-schema-js-yaml');
 
@@ -57,8 +59,7 @@ async function _buildProject(opts: ProjectOptions) {
   if (userProjectConfig.config && userProjectConfig.config.Migration) {
     transformOutput = adjustBuildForMigration(transformOutput, userProjectConfig.config.Migration);
   }
-  const merged = mergeUserConfigWithTransformOutput(userProjectConfig, transformOutput);
-  return merged;
+  return mergeUserConfigWithTransformOutput(userProjectConfig, transformOutput);
 }
 
 /**
@@ -83,7 +84,7 @@ function getStackMappingFromProjectConfig(config?: TransformConfig): StackMappin
  * version of the Amplify CLI. Mainly this prevents the deletion of DynamoDB tables
  * while still allowing the transform to customize that logical resource.
  * @param resources The resources to change.
- * @param idsToHoist The logical ids to hoist into the root of the template.
+ * @param migrationConfig
  */
 function adjustBuildForMigration(resources: DeploymentResources, migrationConfig?: TransformMigrationConfig): DeploymentResources {
   if (migrationConfig && migrationConfig.V1) {
@@ -96,7 +97,7 @@ function adjustBuildForMigration(resources: DeploymentResources, migrationConfig
       const template = resources.stacks[stackKey];
       for (const resourceKey of Object.keys(template.Resources)) {
         if (resourceIdMap[resourceKey]) {
-          // Handle any special detials for migrated details.
+          // Handle any special details for migrated details.
           const resource = template.Resources[resourceKey];
           template.Resources[resourceKey] = formatMigratedResource(resource);
         }
@@ -105,7 +106,7 @@ function adjustBuildForMigration(resources: DeploymentResources, migrationConfig
     const rootStack = resources.rootStack;
     for (const resourceKey of Object.keys(rootStack.Resources)) {
       if (resourceIdMap[resourceKey]) {
-        // Handle any special detials for migrated details.
+        // Handle any special details for migrated details.
         const resource = rootStack.Resources[resourceKey];
         rootStack.Resources[resourceKey] = formatMigratedResource(resource);
       }
@@ -270,21 +271,13 @@ function mergeUserConfigWithTransformOutput(userConfig: Partial<DeploymentResour
     transformStacks[userStack] = userDefinedStack;
     // Split on non alphabetic characters to make a valid resource id.
     const stackResourceId = userStack.split(/[^A-Za-z]/).join('');
-    const customNestedStack = new CloudFormation.Stack({
+    rootStack.Resources[stackResourceId] = new CloudFormation.Stack({
       Parameters: parametersForStack,
       TemplateURL: Fn.Sub(`https://\${S3DeploymentBucket}.s3.amazonaws.com/\${S3DeploymentRootKey}/stacks/${userStack}`, {
         S3DeploymentBucket: { Ref: 'S3DeploymentBucket' },
         S3DeploymentRootKey: { Ref: 'S3DeploymentRootKey' },
       }),
-      //   Fn.Join('/', [
-      //   'https://s3.amazonaws.com',
-      //   Fn.Ref(ResourceConstants.PARAMETERS.S3DeploymentBucket),
-      //   Fn.Ref(ResourceConstants.PARAMETERS.S3DeploymentRootKey),
-      //   'stacks',
-      //   userStack,
-      // ]),
     }).dependsOn(allResourceIds);
-    rootStack.Resources[stackResourceId] = customNestedStack;
   }
 
   // Update the Root Stack Params since we have added the Child Stack Params if they are missing.
@@ -307,30 +300,22 @@ export interface UploadOptions {
  * @param opts Deployment options.
  */
 export async function uploadDeployment(opts: UploadOptions) {
-  try {
-    if (!opts.directory) {
-      throw new Error(`You must provide a 'directory'`);
-    }
-    if (!fs.existsSync(opts.directory)) {
-      throw new Error(`Invalid 'directory': directory does not exist at ${opts.directory}`);
-    }
-    if (!opts.upload || typeof opts.upload !== 'function') {
-      throw new Error(`You must provide an 'upload' function`);
-    }
-    await walkDirPosix(opts.directory, opts.upload);
-  } catch (e) {
-    throw e;
+  if (!opts.directory) {
+    throw new Error(`You must provide a 'directory'`);
   }
+  if (!fs.existsSync(opts.directory)) {
+    throw new Error(`Invalid 'directory': directory does not exist at ${opts.directory}`);
+  }
+  if (!opts.upload || typeof opts.upload !== 'function') {
+    throw new Error(`You must provide an 'upload' function`);
+  }
+  await walkDirPosix(opts.directory, opts.upload);
 }
 
-function execAndLog(command: string) {
-  console.log(command);
-  exec(command, (error, stdout, stderr) => {
-    if (error) {
-      console.log(`exec: ${command}`);
-      console.error(`exec error: ${error}`);
-      return;
-    }
+async function execAndLog(command: string) {
+  // console.log(command);
+  try {
+    const { stdout, stderr } = await exec(command);
     if (stdout) {
       console.log(`stdout: ${stdout}`);
     }
@@ -338,13 +323,17 @@ function execAndLog(command: string) {
       console.log(`exec: ${command}`);
       console.log(`stderr: ${stderr}`);
     }
-  });
+  } catch (error) {
+    console.log(`exec: ${command}`);
+    console.error(`exec error: ${error}`);
+    return;
+  }
 }
 
-function flipJsonToYaml(jsonFileName: string) {
+async function flipJsonToYaml(jsonFileName: string) {
   const yamlFileName = jsonFileName.replace('.json', '.yaml');
   const flipCommand = `cfn-flip --yaml --clean ${jsonFileName} ${yamlFileName}`;
-  execAndLog(flipCommand);
+  await execAndLog(flipCommand);
 }
 
 /**
@@ -356,72 +345,98 @@ async function writeDeploymentToDisk(
   rootStackFileName: string = 'rootStack.json',
   buildParameters: Object
 ) {
-  // Delete the last deployments resources.
-  await emptyDirectory(directory);
+  const prepareDirectories = async () => {
+    // Delete the last deployments resources.
+    await emptyDirectory(directory);
+    // Setup the directories if they do not exist.
+    await initStacksAndResolversDirectories(directory);
+  };
 
   // Write the schema to disk
-  const schema = deployment.schema;
-  const fullSchemaPath = path.normalize(directory + `/schema.graphql`);
-  fs.writeFileSync(fullSchemaPath, schema);
-
-  // Setup the directories if they do not exist.
-  initStacksAndResolversDirectories(directory);
+  const writeSchema = async () => {
+    const schema = deployment.schema;
+    const fullSchemaPath = path.normalize(directory + `/schema.graphql`);
+    await fs.writeFile(fullSchemaPath, schema);
+  };
 
   // Write resolvers to disk
-  const resolverFileNames = Object.keys(deployment.resolvers);
-  const resolverRootPath = resolverDirectoryPath(directory);
-  for (const resolverFileName of resolverFileNames) {
-    const fullResolverPath = path.normalize(resolverRootPath + '/' + resolverFileName);
-    fs.writeFileSync(fullResolverPath, deployment.resolvers[resolverFileName]);
-  }
+  const writeResolvers = async () => {
+    const resolverFileNames = Object.keys(deployment.resolvers);
+    const resolverRootPath = resolverDirectoryPath(directory);
+    await Promise.all(
+      resolverFileNames.map(async resolverFileName => {
+        const fullResolverPath = path.normalize(resolverRootPath + '/' + resolverFileName);
+        await fs.writeFile(fullResolverPath, deployment.resolvers[resolverFileName]);
+      })
+    );
+  };
 
   // Write pipeline resolvers to disk
-  const pipelineFunctions = Object.keys(deployment.pipelineFunctions);
-  const pipelineFunctionRootPath = pipelineFunctionDirectoryPath(directory);
-  for (const functionFileName of pipelineFunctions) {
-    const fullTemplatePath = path.normalize(pipelineFunctionRootPath + '/' + functionFileName);
-    fs.writeFileSync(fullTemplatePath, deployment.pipelineFunctions[functionFileName]);
-  }
+  const writePipelines = async () => {
+    const pipelineFunctions = Object.keys(deployment.pipelineFunctions);
+    const pipelineFunctionRootPath = pipelineFunctionDirectoryPath(directory);
+    await Promise.all(
+      pipelineFunctions.map(async functionFileName => {
+        const fullTemplatePath = path.normalize(pipelineFunctionRootPath + '/' + functionFileName);
+        await fs.writeFile(fullTemplatePath, deployment.pipelineFunctions[functionFileName]);
+      })
+    );
+  };
 
   // Write the stacks to disk
-  const stackNames = Object.keys(deployment.stacks);
-  const stackRootPath = stacksDirectoryPath(directory);
-  for (const stackFileName of stackNames) {
-    const fileNameParts = stackFileName.split('.');
-    if (fileNameParts.length === 1) {
-      fileNameParts.push('json');
-    }
-    const fullFileName = fileNameParts.join('.');
-    throwIfNotJSONExt(fullFileName);
-    const fullStackPath = path.normalize(stackRootPath + '/' + fullFileName);
-    let stackString: any = deployment.stacks[stackFileName];
-    stackString =
-      typeof stackString === 'string' ? deployment.stacks[stackFileName] : JSON.stringify(deployment.stacks[stackFileName], null, 4);
-    fs.writeFileSync(fullStackPath, stackString);
-    flipJsonToYaml(fullStackPath);
-  }
+  const writeStacks = async () => {
+    const stackNames = Object.keys(deployment.stacks);
+    const stackRootPath = stacksDirectoryPath(directory);
+    await Promise.all(
+      stackNames.map(async stackFileName => {
+        const fileNameParts = stackFileName.split('.');
+        if (fileNameParts.length === 1) {
+          fileNameParts.push('json');
+        }
+        const fullFileName = fileNameParts.join('.');
+        throwIfNotJSONExt(fullFileName);
+        const fullStackPath = path.normalize(stackRootPath + '/' + fullFileName);
+        let stackString: any = deployment.stacks[stackFileName];
+        stackString =
+          typeof stackString === 'string' ? deployment.stacks[stackFileName] : JSON.stringify(deployment.stacks[stackFileName], null, 4);
+        await fs.writeFile(fullStackPath, stackString);
+        flipJsonToYaml(fullStackPath);
+      })
+    );
+  };
 
   // Write any functions to disk
-  const functionNames = Object.keys(deployment.functions);
-  const functionRootPath = path.normalize(directory + `/functions`);
-  if (!fs.existsSync(functionRootPath)) {
-    fs.mkdirSync(functionRootPath);
-  }
-  for (const functionName of functionNames) {
-    const fullFunctionPath = path.normalize(functionRootPath + '/' + functionName);
-    const zipContents = fs.readFileSync(deployment.functions[functionName]);
-    fs.writeFileSync(fullFunctionPath, zipContents);
-  }
-  const rootStack = deployment.rootStack;
-  const rootStackPath = path.normalize(directory + `/${rootStackFileName}`);
-  fs.writeFileSync(rootStackPath, JSON.stringify(rootStack, null, 4));
+  const writeFunctions = async () => {
+    const functionNames = Object.keys(deployment.functions);
+    const functionRootPath = path.normalize(directory + `/functions`);
+    await fs.mkdirp(functionRootPath);
+    await Promise.all(
+      functionNames.map(async functionName => {
+        const fullFunctionPath = path.normalize(functionRootPath + '/' + functionName);
+        const zipContents = fs.readFileSync(deployment.functions[functionName]);
+        await fs.writeFile(fullFunctionPath, zipContents);
+      })
+    );
+  };
 
-  flipJsonToYaml(rootStackPath);
+  // Write root stack
+  const writeRootStack = async () => {
+    const rootStack = deployment.rootStack;
+    const rootStackPath = path.normalize(directory + `/${rootStackFileName}`);
+    await fs.writeFile(rootStackPath, JSON.stringify(rootStack, null, 4));
 
-  // Write params to disk
-  const jsonString = JSON.stringify(buildParameters, null, 4);
-  const parametersOutputFilePath = path.join(directory, PARAMETERS_FILE_NAME);
-  fs.writeFileSync(parametersOutputFilePath, jsonString);
+    flipJsonToYaml(rootStackPath);
+  };
+
+  // Write parameters to disk
+  const writeParams = async () => {
+    // Write params to disk
+    const jsonString = JSON.stringify(buildParameters, null, 4);
+    const parametersOutputFilePath = path.join(directory, PARAMETERS_FILE_NAME);
+    await fs.writeFile(parametersOutputFilePath, jsonString);
+  };
+  await prepareDirectories();
+  await Promise.all([writeSchema(), writeResolvers(), writePipelines(), writeStacks(), writeFunctions(), writeRootStack(), writeParams()]);
 }
 
 interface MigrationOptions {
@@ -430,7 +445,7 @@ interface MigrationOptions {
 }
 
 /**
- * Using the current cloudbackend as the source of truth of the current env,
+ * Using the current cloud backend as the source of truth of the current env,
  * move the deployment forward to the intermediate stage before allowing the
  * rest of the deployment to take place.
  * @param opts
@@ -479,7 +494,7 @@ export async function readV1ProjectConfiguration(projectDirectory: string): Prom
 
   // Get the template
   const cloudFormationTemplatePath = path.join(projectDirectory, CLOUDFORMATION_FILE_NAME);
-  const cloudFormationTemplateExists = await fs.exists(cloudFormationTemplatePath);
+  const cloudFormationTemplateExists = await fs.pathExists(cloudFormationTemplatePath);
   if (!cloudFormationTemplateExists) {
     throw new Error(`Could not find cloudformation template at ${cloudFormationTemplatePath}`);
   }
@@ -488,7 +503,7 @@ export async function readV1ProjectConfiguration(projectDirectory: string): Prom
 
   // Get the params
   const parametersFilePath = path.join(projectDirectory, 'parameters.json');
-  const parametersFileExists = await fs.exists(parametersFilePath);
+  const parametersFileExists = await fs.pathExists(parametersFilePath);
   if (!parametersFileExists) {
     throw new Error(`Could not find parameters.json at ${parametersFilePath}`);
   }
@@ -542,8 +557,7 @@ export function makeTransformConfigFromOldProject(project: AmplifyApiV1Project):
 
 function formatMigratedResource(obj: any) {
   const jsonNode = obj && typeof obj.toJSON === 'function' ? obj.toJSON() : obj;
-  const withoutEncryption = removeSSE(jsonNode);
-  return withoutEncryption;
+  return removeSSE(jsonNode);
 }
 
 function removeSSE(resource: any) {
@@ -627,8 +641,7 @@ async function updateToIntermediateProject(projectDirectory: string, project: Am
       case 'schemaGraphql':
         break;
       default: {
-        const param = project.template.Parameters[key];
-        filteredTemplateParameters[key] = param;
+        filteredTemplateParameters[key] = project.template.Parameters[key];
         if (project.parameters[key]) {
           filteredParameterValues[key] = project.parameters[key];
         }
@@ -661,22 +674,16 @@ async function updateToIntermediateProject(projectDirectory: string, project: Am
   fs.writeFileSync(parametersInputPath, JSON.stringify(filteredParameterValues, null, 4));
 
   // If the resolvers & stacks directories do not exist, create them.
-  initStacksAndResolversDirectories(projectDirectory);
+  await initStacksAndResolversDirectories(projectDirectory);
 }
 
-function initStacksAndResolversDirectories(directory: string) {
-  const resolverRootPath = resolverDirectoryPath(directory);
-  if (!fs.existsSync(resolverRootPath)) {
-    fs.mkdirSync(resolverRootPath);
-  }
-  const pipelineFunctionRootPath = pipelineFunctionDirectoryPath(directory);
-  if (!fs.existsSync(pipelineFunctionRootPath)) {
-    fs.mkdirSync(pipelineFunctionRootPath);
-  }
-  const stackRootPath = stacksDirectoryPath(directory);
-  if (!fs.existsSync(stackRootPath)) {
-    fs.mkdirSync(stackRootPath);
-  }
+async function initStacksAndResolversDirectories(directory: string) {
+  const requiredDirectories = [resolverDirectoryPath(directory), pipelineFunctionDirectoryPath(directory), stacksDirectoryPath(directory)];
+  await Promise.all(
+    requiredDirectories.map(async dir => {
+      await fs.mkdirp(dir);
+    })
+  );
 }
 
 function pipelineFunctionDirectoryPath(rootPath: string) {

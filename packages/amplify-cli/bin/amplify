@@ -1,4 +1,16 @@
 #!/usr/bin/env node
-// eslint-disable-next-line no-global-assign
+/* eslint-disable import/newline-after-import,no-global-assign */
+// (un)set stack trace limit for deeply nested function calls
+Error.stackTraceLimit = Infinity;
+
 require = require('esm')(module);
+
+// pretty-error: Show stack traces with less clutter, easier to read
+const pe = require('pretty-error');
+pe.start();
+
+// console-inject: Logging with filenames & line numbers
+// require('console-inject');
+
+// noinspection JSIgnoredPromiseFromCall
 require('../lib/index').run();

@@ -458,13 +458,15 @@ function getConfigForEnv(context, envName) {
           throw new Error(`Corrupt file contents in ${configInfoFilePath}`);
         }
         projectConfigInfo.configLevel = 'project';
-      } else {
+      } else if (aws && aws.config) {
         // FIX: If configLevel == general, then this didn't happen... and it needs to!
         const { accessKeyId, secretAccessKey, sessionToken } = aws.config.credentials;
         projectConfigInfo.config.accessKeyId = accessKeyId;
         projectConfigInfo.config.secretAccessKey = secretAccessKey;
         projectConfigInfo.config.sessionToken = sessionToken;
         projectConfigInfo.config.region = aws.config.region;
+      } else {
+        context.print.error(`Could not find configuration for environment ${envName}!`);
       }
     } catch (e) {
       throw e;

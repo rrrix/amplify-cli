@@ -4,10 +4,12 @@ try {
   delete require.cache[require.resolve('aws-sdk')];
   process.env.AWS_SDK_LOAD_CONFIG = true;
   aws = require('aws-sdk');
+  console.log(`Loaded aws-sdk with AWS_SDK_LOAD_CONFIG`);
 } catch (e) {
   delete require.cache[require.resolve('aws-sdk')];
   delete process.env.AWS_SDK_LOAD_CONFIG;
   aws = require('aws-sdk');
+  console.error(`WARNING: Unable to load aws-sdk with AWS_SDK_LOAD_CONFIG`);
 }
 
 const proxyAgent = require('proxy-agent');

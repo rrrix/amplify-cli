@@ -1,4 +1,5 @@
 import * as path from 'path';
+
 const fs = require('fs-extra');
 
 /**
@@ -57,8 +58,7 @@ export async function readFromPath(directory: string): Promise<any> {
   const accum = {};
   for (const fileName of files) {
     const fullPath = path.join(directory, fileName);
-    const value = await readFromPath(fullPath);
-    accum[fileName] = value;
+    accum[fileName] = await readFromPath(fullPath);
   }
   return accum;
 }
@@ -86,24 +86,22 @@ export async function handleFile(handler: FileHandler, key: string, body: Buffer
     throw e;
   }
 }
-async function asyncForEach(array: Array<any>, callback: Function) {
-  for (let index = 0; index < array.length; index += 1) {
-    await callback(array[index], index, array);
-  }
-}
+
 export async function walkDirRec(dir: string, handler: FileHandler, relativePath: string = '', joinPath: (...paths: string[]) => string) {
   const files = await fs.readdir(dir);
-  await asyncForEach(files, async file => {
-    const resourcePath = path.join(dir, file);
-    const newRelPath = joinPath(relativePath, file);
-    const isDirectory = (await fs.lstat(resourcePath)).isDirectory();
-    if (isDirectory) {
-      await walkDirRec(resourcePath, handler, newRelPath, joinPath);
-    } else {
-      const resourceContents = await fs.readFile(resourcePath);
-      await handleFile(handler, newRelPath, resourceContents);
-    }
-  });
+  await Promise.all(
+    files.map(async file => {
+      const resourcePath = path.join(dir, file);
+      const newRelPath = joinPath(relativePath, file);
+      const isDirectory = (await fs.lstat(resourcePath)).isDirectory();
+      if (isDirectory) {
+        await walkDirRec(resourcePath, handler, newRelPath, joinPath);
+      } else {
+        const resourceContents = await fs.readFile(resourcePath);
+        await handleFile(handler, newRelPath, resourceContents);
+      }
+    })
+  );
 }
 
 export async function walkDir(dir: string, handler: (file: { Key: string; Body: Buffer | string }) => Promise<string>) {

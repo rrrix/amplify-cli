@@ -23,29 +23,28 @@ const CNF_ERROR_STATUS = ['CREATE_FAILED', 'DELETE_FAILED', 'UPDATE_FAILED'];
 class CloudFormation {
   constructor(context, userAgentAction, options = {}) {
     return (async () => {
-      let userAgentParam;
-      if (userAgentAction) {
-        userAgentParam = formUserAgentParam(context, userAgentAction);
-      }
-
+      this.userAgentAction = userAgentAction;
+      this.options = options;
       this.pollQueue = new BottleNeck({ minTime: 100, maxConcurrent: CFN_MAX_CONCURRENT_REQUEST });
       this.pollQueueStacks = [];
       this.stackEvents = [];
-      let cred;
-      try {
-        cred = await configurationManager.loadConfiguration(context);
-      } catch (e) {
-        // no credential. New project
-      }
-      const userAgentOption = {};
-      if (userAgentAction) {
-        userAgentOption.customUserAgent = userAgentParam;
-      }
-
-      this.cfn = new aws.CloudFormation({ ...cred, ...options, ...userAgentOption });
       this.context = context;
+      await this.refreshCloudFormationClient();
       return this;
     })();
+  }
+
+  async refreshCloudFormationClient() {
+    let userAgentParam;
+    if (this.userAgentAction) {
+      userAgentParam = formUserAgentParam(this.context, this.userAgentAction);
+    }
+    const userAgentOption = {};
+    if (this.userAgentAction) {
+      userAgentOption.customUserAgent = userAgentParam;
+    }
+    const cred = await configurationManager.loadConfiguration(this.context);
+    this.cfn = new aws.CloudFormation({ ...cred, ...this.options, ...userAgentOption });
   }
 
   createResourceStack(cfnParentStackParams) {

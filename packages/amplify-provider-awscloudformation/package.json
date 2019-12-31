@@ -17,6 +17,7 @@
     "chalk": "^2.4.2",
     "cloudformation-schema-js-yaml": "^1.0.1",
     "columnify": "^1.5.4",
+    "date-fns": "^2.8.1",
     "extract-zip": "^1.6.7",
     "folder-hash": "^2.0.0",
     "fs-extra": "^8.1.0",

@@ -146,7 +146,7 @@ export default function splitStack(opts: SplitStackOptions): NestedStacks {
 
   /**
    * Looks at each stack to find all its Ref and GetAtt expressions
-   * and relaces them with Import/Export (when siblings) and Parameter/Ref
+   * and replaces them with Import/Export (when siblings) and Parameter/Ref
    * (when parent-child).
    */
   function replaceReferences(stacks: { [name: string]: Template }, resourceToStackMap: { [key: string]: string }): NestedStackInfo {
@@ -303,7 +303,7 @@ export default function splitStack(opts: SplitStackOptions): NestedStacks {
     // MAX_CONCURRENT_STACKS is a magic number that will create a dependency tree for
     // schemas with large numbers of types. DynamoDB has a limit on the number of
     // Indexed Tables and GSI's that can be concurrently created.
-    const MAX_CONCURRENT_STACKS = 10;
+    const MAX_CONCURRENT_STACKS = 20;
     let x = 1;
 
     stackFileNames.forEach((stackName, index) => {
