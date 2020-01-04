@@ -140,6 +140,8 @@ export type ConfiguredAuthProviders = {
   hasIAM: boolean;
 };
 
+const APPSYNC_STACK_NAME = 'AppSync';
+
 export class ModelAuthTransformer extends Transformer {
   resources: ResourceFactory;
   config: ModelAuthTransformerConfig;

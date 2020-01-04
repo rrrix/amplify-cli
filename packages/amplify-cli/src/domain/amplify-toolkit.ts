@@ -32,6 +32,7 @@ export class AmplifyToolkit {
   private _pathManager: any;
   private _pressEnterToContinue: any;
   private _pushResources: any;
+  private _buildProject: any;
   private _storeCurrentCloudBackend: any;
   private _readJsonFile: any;
   private _removeEnvFromCloud: any;
@@ -73,6 +74,10 @@ export class AmplifyToolkit {
   get buildResources(): any {
     this._buildResources = this._buildResources || require(path.join(this._amplifyHelpersDirPath, 'build-resources')).buildResources;
     return this._buildResources;
+  }
+  get buildProject(): any {
+    this._buildProject = this._buildProject || require(path.join(this._amplifyHelpersDirPath, 'build-project')).buildProject;
+    return this._buildProject;
   }
   get confirmPrompt(): any {
     this._confirmPrompt = this._confirmPrompt || require(path.join(this._amplifyHelpersDirPath, 'confirm-prompt'));

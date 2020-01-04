@@ -6,6 +6,7 @@ const { isCodegenConfigured } = require('../utils');
 const prePushUpdateCallback = require('./prePushUpdateCallback');
 
 async function prePushAddCallback(context, resourceName) {
+  console.log(`prePushAddGraphQLCodegenHook...`);
   // when codegen is already configured
   if (isCodegenConfigured(context, resourceName)) {
     return prePushUpdateCallback(context, resourceName);

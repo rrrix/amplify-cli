@@ -43,7 +43,16 @@ class CloudFormation {
     if (this.userAgentAction) {
       userAgentOption.customUserAgent = userAgentParam;
     }
-    const cred = await configurationManager.loadConfiguration(this.context);
+
+    let cred;
+    try {
+      cred = await configurationManager.loadConfiguration(this.context);
+    } catch (e) {
+      if (this.context.input.command !== 'init' && e.name !== 'UndeterminedEnvironmentError') {
+        throw e;
+      }
+      // no credential. New project
+    }
     this.cfn = new aws.CloudFormation({ ...cred, ...this.options, ...userAgentOption });
   }
 
@@ -175,9 +184,20 @@ class CloudFormation {
 
   getStackEvents(stackName) {
     const self = this;
-    return this.cfn
-      .describeStackEvents({ StackName: stackName })
-      .promise()
+    const describeStackEvents = async () => {
+      let attempt = 1;
+      while (attempt <= 2) {
+        try {
+          attempt++;
+          return this.cfn.describeStackEvents({ StackName: stackName }).promise();
+        } catch (e) {
+          console.log(`Error describing stack events, attempting credential refresh and retry: code: ${e.code}: ${e.message}\n${e.stack}`);
+          await this.refreshCloudFormationClient();
+        }
+      }
+    };
+
+    return describeStackEvents()
       .then(data => {
         let events = data.StackEvents;
         events = events.filter(event => self.eventStartTime < new Date(event.Timestamp));
@@ -187,6 +207,8 @@ class CloudFormation {
         if (e && e.code === 'Throttling') {
           return Promise.resolve([]);
         }
+        console.log(`Error reading Stack Events: (${e.code}): ${e.message}`);
+        console.log(e.stack);
         Promise.reject(e);
       });
   }

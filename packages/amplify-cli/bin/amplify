@@ -1,16 +1,17 @@
 #!/usr/bin/env node
 /* eslint-disable import/newline-after-import,no-global-assign */
 // (un)set stack trace limit for deeply nested function calls
-Error.stackTraceLimit = Infinity;
+Error.stackTraceLimit = 100;
 
 require = require('esm')(module);
 
 // pretty-error: Show stack traces with less clutter, easier to read
-const pe = require('pretty-error');
-pe.start();
+// const pe = require('pretty-error');
+// pe.start();
 
 // console-inject: Logging with filenames & line numbers
 // require('console-inject');
 
 // noinspection JSIgnoredPromiseFromCall
-require('../lib/index').run();
+const indx = require('../lib/index');
+indx.run();

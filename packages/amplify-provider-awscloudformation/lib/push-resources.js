@@ -197,19 +197,26 @@ function storeCurrentCloudBackend(context) {
   fs.mkdirpSync(tempDir);
 
   const zipFilePath = path.normalize(path.join(tempDir, zipFilename));
-  return archiver
-    .run(currentCloudBackendDir, zipFilePath)
-    .then(result => {
-      const s3Key = `${result.zipFilename}`;
-      return new S3(context).then(s3 => {
-        const s3Params = {
-          Body: fs.createReadStream(result.zipFilePath),
-          Key: s3Key,
-        };
-        return s3.uploadFile(s3Params);
-      });
-    })
-    .then(fs.remove(tempDir));
+  const archive = archiver.run(currentCloudBackendDir, zipFilePath).then(() => archive);
+  const s3Params = {
+    Body: fs.createReadStream(archive.zipFilePath),
+    Key: archive.zipFilename,
+  };
+  return new S3(context).uploadFile(s3Params).then(fs.remove(tempDir));
+
+  // return archiver
+  //   .run(currentCloudBackendDir, zipFilePath)
+  //   .then(result => {
+  //     // const s3Key = `${result.zipFilename}`;
+  //     return new S3(context).then(s3 => {
+  //       const s3Params = {
+  //         Body: fs.createReadStream(result.zipFilePath),
+  //         Key: s3Key,
+  //       };
+  //       return s3.uploadFile(s3Params);
+  //     });
+  //   })
+  //   .then(fs.remove(tempDir));
 }
 
 async function validateCfnTemplates(context, resourcesToBeUpdated) {
@@ -574,4 +581,15 @@ module.exports = {
   run,
   updateStackForAPIMigration,
   storeCurrentCloudBackend,
+  validateCfnTemplates,
+  packageResources,
+  updateCloudFormationNestedStack,
+  getAllUniqueCategories,
+  getCfnFiles,
+  updateS3Templates,
+  execAndLog,
+  flipJsonToYaml,
+  uploadTemplateToS3,
+  buildRootStack,
+  updateIdPRolesInNestedStack,
 };

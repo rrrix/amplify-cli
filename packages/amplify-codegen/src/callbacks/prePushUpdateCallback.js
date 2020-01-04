@@ -5,6 +5,7 @@ const askShouldUpdateCode = require('../walkthrough/questions/updateCode');
 const askShouldUpdateDocs = require('../walkthrough/questions/updateDocs');
 
 async function prePushUpdateCallback(context, resourceName) {
+  console.log(`prePushUpdateGraphQLCodegenHook...`);
   const config = loadConfig(context);
   const project = config.getProjects().find(projectItem => projectItem.projectName === resourceName);
   if (project) {

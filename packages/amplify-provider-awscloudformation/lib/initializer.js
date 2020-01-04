@@ -1,3 +1,4 @@
+const util = require('util');
 const moment = require('moment');
 const path = require('path');
 const archiver = require('../src/utils/archiver');
@@ -53,7 +54,8 @@ async function run(context) {
       ],
     };
 
-    console.log(JSON.stringify(params, null, 2));
+    console.log(`CloudFormation Params:`);
+    console.log(util.inspect(params));
     const spinner = ora();
     spinner.start('Initializing project in the cloud...');
     return new Cloudformation(context, 'init', awsConfig)

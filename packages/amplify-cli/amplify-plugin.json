@@ -2,6 +2,7 @@
   "name": "core",
   "type": "core",
   "commands": [
+    "build",
     "categories",
     "configure",
     "console",

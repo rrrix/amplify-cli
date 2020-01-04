@@ -2,6 +2,7 @@ const attachBackendWorker = require('./lib/attach-backend');
 const initializer = require('./lib/initializer');
 const initializeEnv = require('./lib/initialize-env');
 const resourcePusher = require('./lib/push-resources');
+const projectBuilder = require('./lib/build-project');
 const envRemover = require('./lib/delete-env');
 const resourceBuilder = require('./lib/build-resources');
 const providerUtils = require('./lib/utility-functions');
@@ -33,6 +34,10 @@ async function attachBackend(context) {
 
 function onInitSuccessful(context) {
   return initializer.onInitSuccessful(context);
+}
+
+function buildProject(context, resourceList) {
+  return projectBuilder.run(context, resourceList);
 }
 
 function pushResources(context, resourceList) {
@@ -99,6 +104,7 @@ module.exports = {
   configure,
   configureNewUser,
   constants,
+  buildProject,
   pushResources,
   storeCurrentCloudBackend,
   buildResources,

@@ -5,7 +5,7 @@ import { ObjectTypeDefinitionNode, FieldDefinitionNode, DirectiveNode } from 'gr
 import { AppSync, IAM, Fn } from 'cloudform-types';
 import { lambdaArnResource } from './lambdaArns';
 
-const FUNCTION_DIRECTIVE_STACK = 'FunctionDirectiveStack';
+const FUNCTION_DIRECTIVE_STACK = 'Functions';
 
 export class FunctionTransformer extends Transformer {
   constructor() {

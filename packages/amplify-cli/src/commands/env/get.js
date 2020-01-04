@@ -1,4 +1,9 @@
 const chalk = require('chalk');
+const util = require('util');
+
+const inspect = obj => {
+  return util.inspect(obj, { depth: null });
+};
 
 module.exports = {
   name: 'get',
@@ -29,7 +34,8 @@ module.exports = {
           context.print.info(`Provider: ${provider}`);
 
           Object.keys(allEnvs[env][provider]).forEach(providerAttr => {
-            context.print.info(`${providerAttr}: ${allEnvs[env][provider][providerAttr]}`);
+            const element = inspect(allEnvs[env][provider][providerAttr]);
+            context.print.info(`${providerAttr}: ${element}`);
           });
 
           context.print.info('--------------');

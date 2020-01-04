@@ -7,14 +7,14 @@ const spinner = ora('');
 const { getProviderPlugins } = require('../extensions/amplify-helpers/get-provider-plugins');
 
 module.exports = {
-  name: 'push',
+  name: 'build',
   run: async context => {
     try {
       context.amplify.constructExeInfo(context);
       await syncCurrentCloudBackend(context);
-      return await context.amplify.pushResources(context);
+      return await context.amplify.buildProject(context);
     } catch (e) {
-      context.print.error(`CRITICAL: An error occurred during the push operation: ${e.message}`);
+      context.print.error(`CRITICAL: An error occurred during the build operation: ${e.message}`);
       console.error(e.stack);
       process.exit(1);
     }

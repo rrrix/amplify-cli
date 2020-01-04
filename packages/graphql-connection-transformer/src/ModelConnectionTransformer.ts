@@ -37,6 +37,7 @@ import { updateCreateInputWithConnectionField, updateUpdateInputWithConnectionFi
 import Table, { KeySchema, GlobalSecondaryIndex, LocalSecondaryIndex } from 'cloudform-types/types/dynamoDb/table';
 
 const CONNECTION_STACK_NAME = 'ConnectionStack';
+const APPSYNC_STACK_NAME = 'AppSyncConnections';
 
 interface RelationArguments {
   keyName?: string;

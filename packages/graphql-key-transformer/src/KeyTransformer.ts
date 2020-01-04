@@ -60,6 +60,8 @@ interface KeyArguments {
   queryField?: string;
 }
 
+const APPSYNC_STACK_NAME = 'AppSync';
+
 export class KeyTransformer extends Transformer {
   constructor() {
     super(

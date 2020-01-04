@@ -4,6 +4,7 @@
     "commands": [
         "add-graphql-datasource",
         "add",
+        "build",
         "console",
         "gql-compile",
         "push",
