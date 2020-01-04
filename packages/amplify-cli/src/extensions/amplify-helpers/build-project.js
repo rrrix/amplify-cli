@@ -1,7 +1,5 @@
 const fs = require('fs-extra');
 const { getProjectConfig } = require('./get-project-config');
-const { showResourceTable } = require('./resource-status');
-const { onCategoryOutputsChange } = require('./on-category-outputs-change');
 const { initializeEnv } = require('../../lib/initialize-env');
 const { getProviderPlugins } = require('./get-provider-plugins');
 const { getEnvInfo } = require('./get-env-info');
