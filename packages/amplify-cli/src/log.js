@@ -1,5 +1,6 @@
 /* eslint-disable no-unused-vars */
 const path = require('path');
+
 const clisrcdir = __dirname;
 const logfilename = __filename;
 
