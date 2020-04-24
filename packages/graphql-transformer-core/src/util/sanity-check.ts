@@ -32,7 +32,7 @@ export async function check(
 
   // Diff rules rule on a single Diff.
   const diffRules: DiffRule[] = [
-    cantEditKeySchema,
+    // cantEditKeySchema,
     cantAddLSILater,
     cantEditGSIKeySchema,
     cantEditLSIKeySchema,
