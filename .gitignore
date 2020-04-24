@@ -1,3 +1,4 @@
+.pip_cache
 **/.DS_Store
 node_modules
 lerna-debug.log
