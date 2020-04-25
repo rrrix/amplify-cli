@@ -4,4 +4,4 @@
 **/yarn.lock
 **/package-lock.json
 **/.eslintrc.js
-**/tslint.json
+**/tsconfig.json

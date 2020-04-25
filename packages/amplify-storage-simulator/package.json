@@ -1,36 +1,51 @@
 {
   "name": "amplify-storage-simulator",
-  "version": "1.0.5",
+  "version": "1.3.1",
   "description": "An S3 simulator to test S3 APIs",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aws-amplify/amplify-cli.git",
+    "directory": "packages/amplify-storage-simulator"
+  },
+  "author": "Amazon Web Services",
+  "license": "Apache-2.0",
   "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "keywords": [
+    "graphql",
+    "appsync",
+    "aws"
+  ],
   "scripts": {
     "test": "jest",
     "build": "tsc",
     "watch": "tsc -w"
   },
-  "author": "Amazon Web Services",
-  "license": "Apache-2.0",
   "dependencies": {
-    "body-parser": "^1.19.0",
-    "cors": "^2.8.5",
-    "event-to-promise": "^0.8.0",
-    "express": "^4.17.1",
-    "glob": "^7.1.4",
-    "ip": "^1.1.5",
-    "lodash": "^4.17.15",
-    "md5-file": "^4.0.0",
-    "object-to-xml": "^2.0.0",
-    "save": "^2.4.0",
-    "serve-static": "^1.14.1",
-    "xml": "^1.0.1",
-    "xml-js": "^1.6.11"
+    "body-parser": "^X",
+    "cors": "^X",
+    "etag": "^X",
+    "event-to-promise": "^X",
+    "express": "^X",
+    "fs-extra": "^X",
+    "glob": "^X",
+    "object-to-xml": "^X",
+    "serve-static": "^X",
+    "uuid": "^X",
+    "xml": "^X",
+    "xml-js": "^X"
   },
   "devDependencies": {
-    "@types/body-parser": "^1.17.0",
-    "@types/cors": "^2.8.5",
-    "@types/glob": "^7.1.1",
-    "@types/serve-static": "^1.13.2",
-    "typescript": "~3.6.4"
+    "@types/body-parser": "^X",
+    "@types/cors": "^X",
+    "@types/etag": "^X",
+    "@types/event-to-promise": "^X",
+    "@types/glob": "^X",
+    "@types/serve-static": "^X",
+    "@types/uuid": "^X",
+    "@types/xml": "^X",
+    "aws-sdk": "^X",
+    "request": "^X"
   },
   "jest": {
     "transform": {
@@ -40,6 +55,7 @@
     "collectCoverageFrom": [
       "**/*.ts",
       "!**/node_modules/**",
+      "!**/lib/**",
       "!__tests__/**"
     ],
     "testURL": "http://localhost/",

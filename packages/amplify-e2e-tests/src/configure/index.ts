@@ -1,20 +1,36 @@
-import * as nexpect from 'nexpect';
+import { nspawn as spawn } from 'amplify-e2e-core';
+import { getCLIPath } from '../utils';
+import { singleSelect } from '../utils/selectors';
 
-import { getCLIPath, isCI } from '../utils';
 type AmplifyConfiguration = {
   accessKeyId: string;
   secretAccessKey: string;
   profileName?: string;
+  region?: string;
 };
 
 const defaultSettings = {
   profileName: 'amplify-integ-test-user',
-  region: '\r',
+  region: 'us-east-2',
   userName: '\r',
 };
 
-const MANDATORY_PARAMS = ['accessKeyId', 'secretAccessKey'];
-export default function amplifyConfigure(settings: AmplifyConfiguration, verbose: Boolean = isCI() ? false : true) {
+const regionOptions = [
+  'us-east-1',
+  'us-east-2',
+  'us-west-2',
+  'eu-west-1',
+  'eu-west-2',
+  'eu-central-1',
+  'ap-northeast-1',
+  'ap-northeast-2',
+  'ap-southeast-1',
+  'ap-southeast-2',
+  'ap-south-1',
+];
+
+const MANDATORY_PARAMS = ['accessKeyId', 'secretAccessKey', 'region'];
+export default function amplifyConfigure(settings: AmplifyConfiguration) {
   const s = { ...defaultSettings, ...settings };
   const missingParam = MANDATORY_PARAMS.filter(p => !Object.keys(s).includes(p));
   if (missingParam.length) {
@@ -22,23 +38,27 @@ export default function amplifyConfigure(settings: AmplifyConfiguration, verbose
   }
 
   return new Promise((resolve, reject) => {
-    nexpect
-      .spawn(getCLIPath(), ['configure'], { stripColors: true, verbose })
+    const chain = spawn(getCLIPath(), ['configure'], { stripColors: true })
       .wait('Sign in to your AWS administrator account:')
       .wait('Press Enter to continue')
-      .sendline('\r')
-      .wait('Specify the AWS Region')
-      .sendline('\r')
+      .sendCarriageReturn()
+      .wait('Specify the AWS Region');
+
+    singleSelect(chain, s.region, regionOptions);
+
+    chain
       .wait('user name:')
-      .sendline('\r')
+      .sendCarriageReturn()
       .wait('Press Enter to continue')
-      .sendline('\r')
+      .sendCarriageReturn()
       .wait('accessKeyId')
-      .sendline(s.accessKeyId)
+      .pauseRecording()
+      .sendLine(s.accessKeyId)
       .wait('secretAccessKey')
-      .sendline(s.secretAccessKey)
+      .sendLine(s.secretAccessKey)
+      .resumeRecording()
       .wait('Profile Name:')
-      .sendline(s.profileName)
+      .sendLine(s.profileName)
       .wait('Successfully set up the new user.')
       .run((err: Error) => {
         if (!err) {

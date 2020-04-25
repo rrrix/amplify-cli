@@ -41,11 +41,11 @@ async function init(amplifyServiceParams) {
           appId: inputAmplifyAppId,
         })
         .promise();
-      context.print.info(`Amplify AppID found: ${inputAmplifyAppId}. Amplify App name is: ${getAppResult.app.name}}`);
+      context.print.info(`Amplify AppID found: ${inputAmplifyAppId}. Amplify App name is: ${getAppResult.app.name}`);
       amplifyAppId = inputAmplifyAppId;
     } catch (e) {
       context.print.error(
-        `Amplify AppID: ${inputAmplifyAppId} not found. Please ensure your local profile matches the AWS account or region in which the Amplify app exists.`
+        `Amplify AppID: ${inputAmplifyAppId} not found. Please ensure your local profile matches the AWS account or region in which the Amplify app exists.`,
       );
       context.print.info(e);
       throw e;
@@ -98,7 +98,7 @@ async function init(amplifyServiceParams) {
         if (appIdsInTheSameLocalProjectAndRegion.length === 1) {
           amplifyAppId = appIdsInTheSameLocalProjectAndRegion[0]; // eslint-disable-line
         } else if (appIdsInTheSameLocalProjectAndRegion.length > 1) {
-          context.print.info(`You project is associated with multiple Amplify Service Apps in the region ${awsConfig.region}`);
+          context.print.info(`Your project is associated with multiple Amplify Service Apps in the region ${awsConfig.region}`);
           amplifyAppId = await SelectFromExistingAppId(context, appIdsInTheSameLocalProjectAndRegion);
         }
       }
@@ -108,6 +108,7 @@ async function init(amplifyServiceParams) {
   if (!amplifyAppId) {
     const createAppParams = {
       name: projectName,
+      environmentVariables: { _LIVE_PACKAGE_UPDATES: '[{"pkg":"@aws-amplify/cli","type":"npm","version":"latest"}]' },
     };
     try {
       const createAppResponse = await amplifyClient.createApp(createAppParams).promise();
@@ -247,13 +248,14 @@ async function postPushCheck(context) {
       if (appIdsInTheSameLocalProjectAndRegion.length === 1) {
         amplifyAppId = appIdsInTheSameLocalProjectAndRegion[0]; // eslint-disable-line
       } else if (appIdsInTheSameLocalProjectAndRegion.length > 1) {
-        context.print.info(`You project is associated with multiple Amplify Service Apps in the region ${region}`);
+        context.print.info(`Your project is associated with multiple Amplify Service Apps in the region ${region}`);
         amplifyAppId = await SelectFromExistingAppId(context, appIdsInTheSameLocalProjectAndRegion);
       }
 
       if (!amplifyAppId) {
         const createAppParams = {
           name: projectConfig.projectName,
+          environmentVariables: { _LIVE_PACKAGE_UPDATES: '[{"pkg":"@aws-amplify/cli","type":"npm","version":"latest"}]' },
         };
 
         try {
@@ -313,14 +315,14 @@ async function SelectFromExistingAppId(context, appIdsInTheSameLocalProjectAndRe
   const answer = await inquirer.prompt({
     type: 'list',
     name: 'selection',
-    message: `Select the app id you want this env to be be associated with`,
+    message: `Select the app id you want this env to be associated with`,
     choices: options,
     default: options[0],
   });
 
   if (answer.selection === LEARNMORE) {
     displayAppIdSelectionLearnMore(context);
-    amplifyAppId = await SelectFromExistingAppId(appIdsInTheSameLocalProjectAndRegion);
+    amplifyAppId = await SelectFromExistingAppId(context, appIdsInTheSameLocalProjectAndRegion);
   }
 
   if (answer.selection !== NONE) {
@@ -334,11 +336,11 @@ function displayAppIdSelectionLearnMore(context) {
   // this should rarely happen
   context.print.info('');
   context.print.green(
-    'The AWS Amplify Console stores information on your backend environment in the cloud to facilitate collaboration workflows for your team.'
+    'The AWS Amplify Console stores information on your backend environment in the cloud to facilitate collaboration workflows for your team.',
   );
   context.print.green('Select an existing AWS Amplify Console app to associate this backend environment with the app.');
   context.print.green(
-    'Select None will lead to the creation of a new AWS Amplify Service App that this backend environment will be associated with.'
+    'Select None will lead to the creation of a new AWS Amplify Service App that this backend environment will be associated with.',
   );
   context.print.info('');
 }

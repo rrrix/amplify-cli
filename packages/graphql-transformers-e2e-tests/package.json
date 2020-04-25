@@ -1,55 +1,58 @@
 {
   "name": "graphql-transformers-e2e-tests",
-  "version": "6.4.0",
+  "version": "6.15.3",
   "description": "End to end functional tests for appsync supported transformers.",
-  "main": "lib/index.js",
   "private": true,
-  "scripts": {
-    "e2e": "jest",
-    "build": "tsc",
-    "clean": "rm -rf ./lib"
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aws-amplify/amplify-cli.git",
+    "directory": "packages/graphql-transformers-e2e-tests"
   },
+  "author": "Amazon Web Services",
+  "license": "Apache-2.0",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
   "keywords": [
     "graphql",
     "appsync",
     "aws"
   ],
-  "author": "Amazon Web Services",
-  "license": "Apache-2.0",
+  "scripts": {
+    "e2e": "jest",
+    "build-tests": "tsc --build tsconfig.tests.json"
+  },
   "dependencies": {
-    "amazon-cognito-identity-js": "^3.0.7",
-    "axios": "^0.19.0",
-    "cloudform": "^4.1.0",
-    "graphql": "^0.13.2",
-    "graphql-mapping-template": "4.4.0",
-    "graphql-transformer-common": "4.4.0",
-    "graphql-transformer-core": "6.4.0",
-    "moment": "^2.24.0"
+    "amazon-cognito-identity-js": "^X",
+    "axios": "^X",
+    "cloudform-types": "^X",
+    "graphql": "^14.0.0",
+    "graphql-transformer-common": "^X",
+    "graphql-transformer-core": "^X",
+    "moment": "^X"
   },
   "devDependencies": {
-    "@types/graphql": "^0.13.4",
-    "@types/jest": "23.1.1",
-    "@types/node": "^8.10.59",
-    "aws-amplify": "^2.1.0",
-    "aws-appsync": "^1.8.1",
-    "aws-sdk": "^2.580.0",
-    "graphql-auth-transformer": "6.4.0",
-    "graphql-connection-transformer": "4.4.0",
-    "graphql-dynamodb-transformer": "6.4.0",
-    "graphql-elasticsearch-transformer": "4.0.5",
-    "graphql-function-transformer": "2.0.5",
-    "graphql-key-transformer": "2.4.0",
-    "graphql-predictions-transformer": "2.0.5",
-    "graphql-tag": "^2.10.1",
-    "graphql-versioned-transformer": "4.4.0",
-    "isomorphic-fetch": "^2.2.1",
-    "jest": "^23.1.0",
-    "jest-junit": "^8.0.0",
-    "node-fetch": "^2.6.0",
-    "ts-jest": "^22.4.6",
-    "tslint": "^5.18.0",
-    "typescript": "~3.6.4",
-    "ws": "4.0.0"
+    "@aws-amplify/core": "^X",
+    "@types/node": "^X",
+    "aws-amplify": "^X",
+    "aws-appsync": "^X",
+    "aws-cdk": "^X",
+    "aws-sdk": "^X",
+    "execa": "^X",
+    "fs-extra": "^X",
+    "graphql-auth-transformer": "^X",
+    "graphql-connection-transformer": "^X",
+    "graphql-dynamodb-transformer": "^X",
+    "graphql-elasticsearch-transformer": "^X",
+    "graphql-function-transformer": "^X",
+    "graphql-http-transformer": "^X",
+    "graphql-key-transformer": "^X",
+    "graphql-predictions-transformer": "^X",
+    "graphql-tag": "^X",
+    "graphql-versioned-transformer": "^X",
+    "isomorphic-fetch": "^X",
+    "jest-junit": "^X",
+    "node-fetch": "^X",
+    "ws": "^X"
   },
   "jest": {
     "transform": {
@@ -71,6 +74,7 @@
     "testRegex": "(src/__tests__/.*.test.*)$",
     "testPathIgnorePatterns": [
       "/lib/",
+      "/resources/",
       "/node_modules/"
     ],
     "moduleFileExtensions": [
@@ -82,7 +86,10 @@
       "node"
     ],
     "globals": {
-      "window": {}
+      "window": {},
+      "ts-jest": {
+        "tsConfig": "tsconfig.tests.json"
+      }
     }
   },
   "jest-junit": {

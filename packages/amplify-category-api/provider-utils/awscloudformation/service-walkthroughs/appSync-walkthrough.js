@@ -1,5 +1,4 @@
-import { getDataStoreLearnMore } from '../sync-conflict-handler-assets/syncAssets';
-
+const syncAssets = require('../sync-conflict-handler-assets/syncAssets');
 const inquirer = require('inquirer');
 const fs = require('fs-extra');
 const uuid = require('uuid');
@@ -71,7 +70,7 @@ async function serviceWalkthrough(context, defaultValuesFilename, serviceMetadat
 
   if (resourceName) {
     context.print.warning(
-      'You already have an AppSync API in your project. Use the "amplify update api" command to update your existing AppSync API.'
+      'You already have an AppSync API in your project. Use the "amplify update api" command to update your existing AppSync API.',
     );
     process.exit(0);
   }
@@ -108,11 +107,9 @@ async function serviceWalkthrough(context, defaultValuesFilename, serviceMetadat
 
   // Ask additonal questions
 
-  /* eslint-disable */
   ({ authConfig, defaultAuthType } = await askDefaultAuthQuestion(context, parameters));
   ({ authConfig, resolverConfig } = await askAdditionalQuestions(context, parameters, authConfig, defaultAuthType));
   await checkForCognitoUserPools(context, parameters, authConfig);
-  /* eslint-disable */
 
   // Ask schema file question
 
@@ -146,6 +143,8 @@ async function serviceWalkthrough(context, defaultValuesFilename, serviceMetadat
 
   // During API add, make sure we're creating a transform.conf.json file with the latest version the CLI supports.
   await updateTransformerConfigVersion(resourceDir);
+
+  await writeResolverConfig(resolverConfig, resourceDir);
 
   // Write the default custom resources stack out to disk.
   const defaultCustomResourcesStack = fs.readFileSync(`${__dirname}/defaultCustomResources.json`);
@@ -219,11 +218,11 @@ async function serviceWalkthrough(context, defaultValuesFilename, serviceMetadat
 
   // Guided creation of the transform schema
   const authTypes = getAuthTypes(authConfig);
-  const onlyApiKeyAuthEnabled = authTypes.includes('API_KEY') && authTypes.length === 1;
+  const cognitoNotEnabled = !authTypes.includes('AMAZON_COGNITO_USER_POOLS');
 
   let templateSchemaChoices = inputs[4].options;
 
-  if (onlyApiKeyAuthEnabled) {
+  if (cognitoNotEnabled) {
     templateSchemaChoices = templateSchemaChoices.filter(schema => schema.value !== 'single-object-auth-schema.graphql');
   }
 
@@ -252,10 +251,6 @@ async function serviceWalkthrough(context, defaultValuesFilename, serviceMetadat
   const targetSchemaFilePath = `${resourceDir}/${schemaFileName}`;
 
   fs.copyFileSync(schemaFilePath, targetSchemaFilePath);
-
-  if (resolverConfig) {
-    await writeResolverConfig(context, resolverConfig, resourceDir);
-  }
 
   if (editSchemaChoice) {
     return context.amplify.openEditor(context, targetSchemaFilePath).then(async () => {
@@ -293,16 +288,19 @@ async function serviceWalkthrough(context, defaultValuesFilename, serviceMetadat
 
   return { answers: resourceAnswers, output: { authConfig }, noCfnFile: true };
 }
-
-async function writeResolverConfig(context, syncConfig, resourceDir) {
-  const localTransformerConfig = await readTransformerConfiguration(resourceDir);
-  localTransformerConfig.ResolverConfig = syncConfig;
-  await writeTransformerConfiguration(resourceDir, localTransformerConfig);
+// write to the transformer conf if the resolverConfig is valid
+async function writeResolverConfig(resolverConfig, resourceDir) {
+  if (resolverConfig && (resolverConfig.project || resolverConfig.models)) {
+    const localTransformerConfig = await readTransformerConfiguration(resourceDir);
+    localTransformerConfig.ResolverConfig = resolverConfig;
+    await writeTransformerConfiguration(resourceDir, localTransformerConfig);
+  }
 }
 
 async function updateTransformerConfigVersion(resourceDir) {
   const localTransformerConfig = await readTransformerConfiguration(resourceDir);
   localTransformerConfig.Version = TRANSFORM_CURRENT_VERSION;
+  localTransformerConfig.ElasticsearchWarning = true;
   await writeTransformerConfiguration(resourceDir, localTransformerConfig);
 }
 
@@ -355,7 +353,9 @@ async function updateWalkthrough(context) {
   const { allResources } = await context.amplify.getResourceStatus();
   let resourceDir;
   let resourceName;
-  let authConfig, defaultAuthType, resolverConfig;
+  let authConfig;
+  let defaultAuthType;
+  let resolverConfig;
   const resources = allResources.filter(resource => resource.service === 'AppSync');
 
   // There can only be one appsync resource
@@ -364,7 +364,7 @@ async function updateWalkthrough(context) {
     if (resource.providerPlugin !== providerName) {
       // TODO: Move message string to seperate file
       throw new Error(
-        `The selected resource is not managed using AWS Cloudformation. Please use the AWS AppSync Console to make updates to your API - ${resource.resourceName}`
+        `The selected resource is not managed using AWS Cloudformation. Please use the AWS AppSync Console to make updates to your API - ${resource.resourceName}`,
       );
     }
     ({ resourceName } = resource);
@@ -402,36 +402,68 @@ async function updateWalkthrough(context) {
     });
   }
 
-  /* eslint-disable */
-  ({ authConfig, defaultAuthType } = await askDefaultAuthQuestion(context, parameters));
-  ({ authConfig, resolverConfig } = await askAdditionalQuestions(context, parameters, authConfig, defaultAuthType, modelTypes));
-  await checkForCognitoUserPools(context, parameters, authConfig);
-  /* eslint-disable */
+  const updateOptionQuestion = {
+    type: 'list',
+    name: 'updateOption',
+    message: 'Select from the options below',
+    choices: [
+      {
+        name: 'Walkthrough all configurations',
+        value: 'all',
+      },
+      {
+        name: 'Update auth settings',
+        value: 'authUpdate',
+      },
+      {
+        name: 'Enable DataStore for entire API',
+        value: 'enableDatastore',
+      },
+    ],
+  };
 
-  const amplifyMetaFilePath = context.amplify.pathManager.getAmplifyMetaFilePath();
-  const amplifyMeta = context.amplify.readJsonFile(amplifyMetaFilePath);
+  let { updateOption } = await inquirer.prompt([updateOptionQuestion]);
 
-  if (amplifyMeta[category][resourceName].output.securityType) {
-    delete amplifyMeta[category][resourceName].output.securityType;
+  if (updateOption === 'enableDatastore') {
+    resolverConfig = {
+      project: { ConflictHandler: 'AUTOMERGE', ConflictDetection: 'VERSION' },
+    };
+  } else if (updateOption === 'authUpdate') {
+    ({ authConfig, defaultAuthType } = await askDefaultAuthQuestion(context, parameters));
+    authConfig = await askAdditionalAuthQuestions(context, parameters, authConfig, defaultAuthType);
+    await checkForCognitoUserPools(context, parameters, authConfig);
+  } else if (updateOption === 'all') {
+    ({ authConfig, defaultAuthType } = await askDefaultAuthQuestion(context, parameters));
+    ({ authConfig, resolverConfig } = await askAdditionalQuestions(context, parameters, authConfig, defaultAuthType, modelTypes));
+    await checkForCognitoUserPools(context, parameters, authConfig);
   }
 
-  amplifyMeta[category][resourceName].output.authConfig = authConfig;
-  let jsonString = JSON.stringify(amplifyMeta, null, '\t');
-  fs.writeFileSync(amplifyMetaFilePath, jsonString, 'utf8');
+  if (authConfig) {
+    const amplifyMetaFilePath = context.amplify.pathManager.getAmplifyMetaFilePath();
+    const amplifyMeta = context.amplify.readJsonFile(amplifyMetaFilePath);
 
-  const backendConfigFilePath = context.amplify.pathManager.getBackendConfigFilePath();
-  const backendConfig = context.amplify.readJsonFile(backendConfigFilePath);
+    if (amplifyMeta[category][resourceName].output.securityType) {
+      delete amplifyMeta[category][resourceName].output.securityType;
+    }
 
-  if (backendConfig[category][resourceName].output.securityType) {
-    delete backendConfig[category][resourceName].output.securityType;
+    amplifyMeta[category][resourceName].output.authConfig = authConfig;
+    let jsonString = JSON.stringify(amplifyMeta, null, 4);
+    fs.writeFileSync(amplifyMetaFilePath, jsonString, 'utf8');
+
+    const backendConfigFilePath = context.amplify.pathManager.getBackendConfigFilePath();
+    const backendConfig = context.amplify.readJsonFile(backendConfigFilePath);
+
+    if (backendConfig[category][resourceName].output.securityType) {
+      delete backendConfig[category][resourceName].output.securityType;
+    }
+
+    backendConfig[category][resourceName].output.authConfig = authConfig;
+    jsonString = JSON.stringify(backendConfig, null, 4);
+    fs.writeFileSync(backendConfigFilePath, jsonString, 'utf8');
   }
-
-  backendConfig[category][resourceName].output.authConfig = authConfig;
-  jsonString = JSON.stringify(backendConfig, null, '\t');
-  fs.writeFileSync(backendConfigFilePath, jsonString, 'utf8');
 
   if (resolverConfig) {
-    await writeResolverConfig(context, resolverConfig, resourceDir);
+    await writeResolverConfig(resolverConfig, resourceDir);
   }
 
   await context.amplify.executeProviderUtils(context, 'awscloudformation', 'compileSchema', {
@@ -503,7 +535,7 @@ async function askResolverConflictQuestion(context, parameters, modelTypes) {
           ],
         };
         if (conflictResolutionStrategy === 'Learn More') {
-          conflictResolutionQuestion.prefix = getDataStoreLearnMore();
+          conflictResolutionQuestion.prefix = syncAssets.getDataStoreLearnMore();
         }
         ({ conflictResolutionStrategy } = await inquirer.prompt([conflictResolutionQuestion]));
       } while (conflictResolutionStrategy === 'Learn More');
@@ -541,7 +573,7 @@ async function askResolverConflictQuestion(context, parameters, modelTypes) {
           resolverConfig.models = {};
           for (let i = 0; i < selectedModelTypes.length; i += 1) {
             resolverConfig.models[selectedModelTypes[i]] = await askConflictResolutionStrategy(
-              `Select the resolution strategy for ${selectedModelTypes[i]} model`
+              `Select the resolution strategy for ${selectedModelTypes[i]} model`,
             );
           }
         }
@@ -637,7 +669,7 @@ async function askAdditionalAuthQuestions(context, parameters, authConfig, defau
 
 async function checkForCognitoUserPools(context, parameters, authConfig) {
   const additionalUserPoolProviders = authConfig.additionalAuthenticationProviders.filter(
-    provider => provider.authenticationType === 'AMAZON_COGNITO_USER_POOLS'
+    provider => provider.authenticationType === 'AMAZON_COGNITO_USER_POOLS',
   );
   const additionalUserPoolProvider = additionalUserPoolProviders.length > 0 ? additionalUserPoolProviders[0] : undefined;
 
@@ -804,7 +836,7 @@ function validateDays(input) {
 
 function validateIssuerUrl(input) {
   const isValid = /^(((?!http:\/\/(?!localhost))([a-zA-Z0-9.]{1,}):\/\/([a-zA-Z0-9-._~:?#@!$&'()*+,;=/]{1,})\/)|(?!http)(?!https)([a-zA-Z0-9.]{1,}):\/\/)$/.test(
-    input
+    input,
   );
 
   if (!isValid) {

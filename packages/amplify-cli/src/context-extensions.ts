@@ -246,18 +246,18 @@ function table(data: string[][], options: any = {}): void {
       t = new CLITable({
         head: header,
         chars: CLI_TABLE_MARKDOWN,
-      }) as CLITable.HorizontalTable;
+      });
       t.push(...data);
       t.unshift(columnHeaderDivider(t));
       break;
     case 'lean':
-      t = new CLITable() as CLITable.HorizontalTable;
+      t = new CLITable();
       t.push(...data);
       break;
     default:
       t = new CLITable({
         chars: CLI_TABLE_COMPACT,
-      }) as CLITable.HorizontalTable;
+      });
       t.push(...data);
   }
   console.log(t.toString());
@@ -316,8 +316,9 @@ function attachTemplate(context: Context) {
       const data = {
         props,
       };
-      const directory = opts.directory;
-      const pathToTemplate = `${directory}/${template}`;
+      // If a directory was supplied, append a directory seprator.
+      // Otherwise, the template path will be use as-is.
+      const pathToTemplate = opts.directory ? path.join(opts.directory, template) : template;
 
       if (!contextFileSystem.isFile(pathToTemplate)) {
         throw new Error(`template not found ${pathToTemplate}`);

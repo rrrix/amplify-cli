@@ -75,6 +75,9 @@ const publicIAMAuthDirective = '@auth(rules: [{allow: public, provider: iam }])'
 const privateWithApiKeyAuthDirective = '@auth(rules: [{allow: private, provider: apiKey }])';
 const publicAuthDirective = '@auth(rules: [{allow: public}])';
 const publicUserPoolsAuthDirective = '@auth(rules: [{allow: public, provider: userPools}])';
+const privateAndPublicDirective = '@auth(rules: [{allow: private}, {allow: public}])';
+const privateAndPrivateIAMDirective = '@auth(rules: [{allow: private}, {allow: private, provider: iam}])';
+const privateIAMDirective = '@auth(rules: [{allow: private, provider: iam}])';
 
 const getSchema = (authDirective: string) => {
   return `
@@ -105,6 +108,27 @@ const getSchemaWithTypeAndFieldAuth = (typeAuthDirective: string, fieldAuthDirec
         createdAt: String
         updatedAt: String
         protected: String ${fieldAuthDirective}
+    }`;
+};
+
+const getSchemaWithNonModelField = (authDirective: string) => {
+  return `
+    type Post @model ${authDirective} {
+        id: ID!
+        title: String!
+        location: Location
+        status: Status
+        createdAt: String
+        updatedAt: String
+    }
+
+    type Location {
+      name: String
+    }
+
+    enum Status {
+      PUBLISHED,
+      DRAFT
     }`;
 };
 
@@ -155,7 +179,7 @@ describe('Validation tests', () => {
       privateAuthDirective,
       apiKeyDefaultConfig,
       `@auth directive with 'userPools' provider found, but the project has no Cognito User \
-Pools authentication provider configured.`
+Pools authentication provider configured.`,
     );
   });
 
@@ -164,7 +188,7 @@ Pools authentication provider configured.`
       publicAuthDirective,
       userPoolsDefaultConfig,
       `@auth directive with 'apiKey' provider found, but the project has no API Key \
-authentication provider configured.`
+authentication provider configured.`,
     );
   });
 
@@ -173,7 +197,7 @@ authentication provider configured.`
       publicIAMAuthDirective,
       userPoolsDefaultConfig,
       `@auth directive with 'iam' provider found, but the project has no IAM \
-authentication provider configured.`
+authentication provider configured.`,
     );
   });
 
@@ -182,7 +206,7 @@ authentication provider configured.`
       ownerOpenIdAuthDirective,
       userPoolsDefaultConfig,
       `@auth directive with 'oidc' provider found, but the project has no OPENID_CONNECT \
-authentication provider configured.`
+authentication provider configured.`,
     );
   });
 
@@ -190,8 +214,8 @@ authentication provider configured.`
     validationTest(
       groupsWithProviderAuthDirective,
       userPoolsDefaultConfig,
-      `@auth directive with 'groups' strategy only supports 'userPools' provider, but found \
-'iam' assigned`
+      `@auth directive with 'groups' strategy only supports 'userPools' and 'oidc' providers, but found \
+'iam' assigned`,
     );
   });
 
@@ -200,7 +224,7 @@ authentication provider configured.`
       ownerWithIAMAuthDirective,
       userPoolsDefaultConfig,
       `@auth directive with 'owner' strategy only supports 'userPools' (default) and \
-'oidc' providers, but found 'iam' assigned.`
+'oidc' providers, but found 'iam' assigned.`,
     );
   });
 
@@ -209,7 +233,7 @@ authentication provider configured.`
       publicUserPoolsAuthDirective,
       userPoolsDefaultConfig,
       `@auth directive with 'public' strategy only supports 'apiKey' (default) and 'iam' providers, but \
-found 'userPools' assigned.`
+found 'userPools' assigned.`,
     );
   });
 
@@ -218,7 +242,7 @@ found 'userPools' assigned.`
       privateWithApiKeyAuthDirective,
       userPoolsDefaultConfig,
       `@auth directive with 'private' strategy only supports 'userPools' (default) and 'iam' providers, but \
-found 'apiKey' assigned.`
+found 'apiKey' assigned.`,
     );
   });
 });
@@ -305,12 +329,12 @@ describe('Type directive transformation tests', () => {
     const queryType = getObjectType(schemaDoc, 'Query');
     const mutationType = getObjectType(schemaDoc, 'Mutation');
 
-    expect(expectTwo(getField(queryType, 'getPost'), ['aws_cognito_user_pools', 'aws_api_key']));
-    expect(expectTwo(getField(queryType, 'listPosts'), ['aws_cognito_user_pools', 'aws_api_key']));
+    expectTwo(getField(queryType, 'getPost'), ['aws_cognito_user_pools', 'aws_api_key']);
+    expectTwo(getField(queryType, 'listPosts'), ['aws_cognito_user_pools', 'aws_api_key']);
 
-    expect(expectOne(getField(mutationType, 'createPost'), 'aws_cognito_user_pools'));
-    expect(expectOne(getField(mutationType, 'updatePost'), 'aws_cognito_user_pools'));
-    expect(expectOne(getField(mutationType, 'deletePost'), 'aws_cognito_user_pools'));
+    expectOne(getField(mutationType, 'createPost'), 'aws_cognito_user_pools');
+    expectOne(getField(mutationType, 'updatePost'), 'aws_cognito_user_pools');
+    expectOne(getField(mutationType, 'deletePost'), 'aws_cognito_user_pools');
   });
 
   test(`'public' with IAM provider adds policy for Unauth role`, () => {
@@ -331,15 +355,15 @@ describe('Type directive transformation tests', () => {
     const queryType = getObjectType(schemaDoc, 'Query');
     const mutationType = getObjectType(schemaDoc, 'Mutation');
 
-    expect(expectTwo(getField(queryType, 'getPost'), ['aws_cognito_user_pools', 'aws_api_key']));
-    expect(expectTwo(getField(queryType, 'listPosts'), ['aws_cognito_user_pools', 'aws_api_key']));
+    expectTwo(getField(queryType, 'getPost'), ['aws_cognito_user_pools', 'aws_api_key']);
+    expectTwo(getField(queryType, 'listPosts'), ['aws_cognito_user_pools', 'aws_api_key']);
 
-    expect(expectOne(getField(mutationType, 'createPost'), 'aws_cognito_user_pools'));
-    expect(expectOne(getField(mutationType, 'updatePost'), 'aws_cognito_user_pools'));
-    expect(expectOne(getField(mutationType, 'deletePost'), 'aws_cognito_user_pools'));
+    expectOne(getField(mutationType, 'createPost'), 'aws_cognito_user_pools');
+    expectOne(getField(mutationType, 'updatePost'), 'aws_cognito_user_pools');
+    expectOne(getField(mutationType, 'deletePost'), 'aws_cognito_user_pools');
 
     const postType = getObjectType(schemaDoc, 'Post');
-    expect(expectTwo(getField(postType, 'protected'), ['aws_cognito_user_pools', 'aws_api_key']));
+    expectTwo(getField(postType, 'protected'), ['aws_cognito_user_pools', 'aws_api_key']);
 
     // Check that resolvers containing the authMode check block
     const authModeCheckSnippet = '## [Start] Determine request authentication mode';
@@ -356,15 +380,15 @@ describe('Type directive transformation tests', () => {
     const queryType = getObjectType(schemaDoc, 'Query');
     const mutationType = getObjectType(schemaDoc, 'Mutation');
 
-    expect(expectOne(getField(queryType, 'getPost'), 'aws_cognito_user_pools'));
-    expect(expectOne(getField(queryType, 'listPosts'), 'aws_cognito_user_pools'));
+    expectOne(getField(queryType, 'getPost'), 'aws_cognito_user_pools');
+    expectOne(getField(queryType, 'listPosts'), 'aws_cognito_user_pools');
 
-    expect(expectOne(getField(mutationType, 'createPost'), 'aws_cognito_user_pools'));
-    expect(expectOne(getField(mutationType, 'updatePost'), 'aws_cognito_user_pools'));
-    expect(expectOne(getField(mutationType, 'deletePost'), 'aws_cognito_user_pools'));
+    expectOne(getField(mutationType, 'createPost'), 'aws_cognito_user_pools');
+    expectOne(getField(mutationType, 'updatePost'), 'aws_cognito_user_pools');
+    expectOne(getField(mutationType, 'deletePost'), 'aws_cognito_user_pools');
 
     const postType = getObjectType(schemaDoc, 'Post');
-    expect(expectOne(getField(postType, 'protected'), 'aws_cognito_user_pools'));
+    expectOne(getField(postType, 'protected'), 'aws_cognito_user_pools');
 
     // Check that resolvers containing the authMode check block
     const authModeCheckSnippet = '## [Start] Determine request authentication mode';
@@ -381,20 +405,114 @@ describe('Type directive transformation tests', () => {
     const queryType = getObjectType(schemaDoc, 'Query');
     const mutationType = getObjectType(schemaDoc, 'Mutation');
 
-    expect(expectTwo(getField(queryType, 'getPost'), ['aws_cognito_user_pools', 'aws_api_key']));
-    expect(expectTwo(getField(queryType, 'listPosts'), ['aws_cognito_user_pools', 'aws_api_key']));
+    expectTwo(getField(queryType, 'getPost'), ['aws_cognito_user_pools', 'aws_api_key']);
+    expectTwo(getField(queryType, 'listPosts'), ['aws_cognito_user_pools', 'aws_api_key']);
 
-    expect(expectOne(getField(mutationType, 'createPost'), 'aws_cognito_user_pools'));
-    expect(expectOne(getField(mutationType, 'updatePost'), 'aws_cognito_user_pools'));
-    expect(expectOne(getField(mutationType, 'deletePost'), 'aws_cognito_user_pools'));
+    expectOne(getField(mutationType, 'createPost'), 'aws_cognito_user_pools');
+    expectOne(getField(mutationType, 'updatePost'), 'aws_cognito_user_pools');
+    expectOne(getField(mutationType, 'deletePost'), 'aws_cognito_user_pools');
 
     const postType = getObjectType(schemaDoc, 'Post');
-    expect(expectTwo(getField(postType, 'protected'), ['aws_cognito_user_pools', 'aws_api_key']));
+    expectTwo(getField(postType, 'protected'), ['aws_cognito_user_pools', 'aws_api_key']);
 
     // Check that resolvers containing the authMode check block
     const authModeCheckSnippet = '## [Start] Determine request authentication mode';
 
     expect(out.resolvers['Post.protected.req.vtl']).toContain(authModeCheckSnippet);
+  });
+
+  test(`Nested types without @model getting directives applied (cognito default, api key additional)`, () => {
+    const schema = getSchemaWithNonModelField(privateAndPublicDirective);
+    const transformer = getTransformer(withAuthModes(userPoolsDefaultConfig, ['API_KEY']));
+
+    const out = transformer.transform(schema);
+    const schemaDoc = parse(out.schema);
+
+    const locationType = getObjectType(schemaDoc, 'Location');
+    const expectedDirectiveNames = [userPoolsDirectiveName, apiKeyDirectiveName];
+
+    if (expectedDirectiveNames && expectedDirectiveNames.length > 0) {
+      let expectedDireciveNameCount = 0;
+
+      for (const expectedDirectiveName of expectedDirectiveNames) {
+        expect(locationType.directives.find(d => d.name.value === expectedDirectiveName)).toBeDefined();
+        expectedDireciveNameCount++;
+      }
+
+      expect(expectedDireciveNameCount).toEqual(locationType.directives.length);
+    }
+  });
+
+  test(`Nested types without @model getting directives applied (cognito default, iam additional)`, () => {
+    const schema = getSchemaWithNonModelField(privateAndPrivateIAMDirective);
+    const transformer = getTransformer(withAuthModes(userPoolsDefaultConfig, ['AWS_IAM']));
+
+    const out = transformer.transform(schema);
+    const schemaDoc = parse(out.schema);
+
+    const locationType = getObjectType(schemaDoc, 'Location');
+    const expectedDirectiveNames = [userPoolsDirectiveName, iamDirectiveName];
+
+    if (expectedDirectiveNames && expectedDirectiveNames.length > 0) {
+      let expectedDireciveNameCount = 0;
+
+      for (const expectedDirectiveName of expectedDirectiveNames) {
+        expect(locationType.directives.find(d => d.name.value === expectedDirectiveName)).toBeDefined();
+        expectedDireciveNameCount++;
+      }
+
+      expect(expectedDireciveNameCount).toEqual(locationType.directives.length);
+
+      expect(out.rootStack.Resources.AuthRolePolicy01).toBeDefined();
+
+      const locationPolicy = out.rootStack.Resources.AuthRolePolicy01.Properties.PolicyDocument.Statement[0].Resource.filter(
+        r =>
+          r['Fn::Sub'] &&
+          r['Fn::Sub'].length &&
+          r['Fn::Sub'].length === 2 &&
+          r['Fn::Sub'][1].typeName &&
+          r['Fn::Sub'][1].typeName === 'Location',
+      );
+      expect(locationPolicy).toBeDefined();
+    }
+  });
+
+  test(`Nested types without @model not getting directives applied for iam, and no policy is generated`, () => {
+    const schema = getSchemaWithNonModelField('');
+    const transformer = getTransformer(withAuthModes(iamDefaultConfig, ['AMAZON_COGNITO_USER_POOLS']));
+
+    const out = transformer.transform(schema);
+    const schemaDoc = parse(out.schema);
+
+    const locationType = getObjectType(schemaDoc, 'Location');
+
+    expect(locationType.directives.length).toBe(0);
+
+    expect(out.rootStack.Resources.AuthRolePolicy01).toBeUndefined();
+  });
+
+  test(`Nested types without @model not getting directives applied for iam, but policy is generated`, () => {
+    const schema = getSchemaWithNonModelField(privateIAMDirective);
+    const transformer = getTransformer(withAuthModes(iamDefaultConfig, ['AMAZON_COGNITO_USER_POOLS']));
+
+    const out = transformer.transform(schema);
+    const schemaDoc = parse(out.schema);
+
+    const locationType = getObjectType(schemaDoc, 'Location');
+
+    expect(locationType.directives.length).toBe(0);
+
+    expect(out.rootStack.Resources.AuthRolePolicy01).toBeDefined();
+
+    const locationPolicy = out.rootStack.Resources.AuthRolePolicy01.Properties.PolicyDocument.Statement[0].Resource.filter(
+      r =>
+        r['Fn::Sub'] &&
+        r['Fn::Sub'].length &&
+        r['Fn::Sub'].length === 2 &&
+        r['Fn::Sub'][1].typeName &&
+        r['Fn::Sub'][1].typeName === 'Location',
+    );
+    expect(locationPolicy).toBeDefined();
   });
 
   // Disabling until troubleshooting the changes
@@ -502,11 +620,11 @@ describe('Type directive transformation tests', () => {
 //     const out = transformer.transform(schema);
 //
 //     expect(out.rootStack.Resources.AuthRolePolicy01).toBeTruthy();
-//     expect(out.rootStack.Resources.AuthRolePolicy01.Properties.PolicyDocument.Statement[0].Resource.length).toEqual(27);
+//     expect(out.rootStack.Resources.AuthRolePolicy01.Properties.PolicyDocument.Statement[0].Resource.length).toEqual(26);
 //     expect(out.rootStack.Resources.AuthRolePolicy02).toBeTruthy();
-//     expect(out.rootStack.Resources.AuthRolePolicy02.Properties.PolicyDocument.Statement[0].Resource.length).toEqual(27);
+//     expect(out.rootStack.Resources.AuthRolePolicy02.Properties.PolicyDocument.Statement[0].Resource.length).toEqual(26);
 //     expect(out.rootStack.Resources.AuthRolePolicy03).toBeTruthy();
-//     expect(out.rootStack.Resources.AuthRolePolicy03.Properties.PolicyDocument.Statement[0].Resource.length).toEqual(2);
+//     expect(out.rootStack.Resources.AuthRolePolicy03.Properties.PolicyDocument.Statement[0].Resource.length).toEqual(4);
 //     expect(out.rootStack.Resources.UnauthRolePolicy01).toBeFalsy();
 //   });
 // });

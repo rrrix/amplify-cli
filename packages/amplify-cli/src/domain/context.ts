@@ -9,7 +9,7 @@ export class Context {
   }
   // ToDo: this is to attach gluegun extensions and other attached properties
   // already used by the plugins.
-  // After the new platform is stablized, we probably should disallow arbituary
+  // After the new platform is stablized, we probably should disallow arbitrary
   // properties to be attached to the context object.
   [key: string]: any;
 }

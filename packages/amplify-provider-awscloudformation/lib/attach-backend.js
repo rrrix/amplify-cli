@@ -15,7 +15,8 @@ async function run(context) {
   const amplifyClient = await getConfiguredAmplifyClient(context, awsConfig);
   if (!amplifyClient) {
     // This happens when the Amplify service is not available in the region
-    const message = `Amplify service is not available in the region ${awsConfig.region ? awsConfig.region : ''}`;
+    const region = awsConfig && awsConfig.region ? awsConfig.region : '<unknown>';
+    const message = `Amplify service is not available in the region ${region}`;
     context.print.error(message);
     throw new Error(message);
   }
@@ -95,11 +96,11 @@ async function getAmplifyApp(context, amplifyClient) {
           appId: inputAmplifyAppId,
         })
         .promise();
-      context.print.info(`Amplify AppID found: ${inputAmplifyAppId}. Amplify App name is: ${getAppResult.app.name}}`);
+      context.print.info(`Amplify AppID found: ${inputAmplifyAppId}. Amplify App name is: ${getAppResult.app.name}`);
       return getAppResult.app;
     } catch (e) {
       context.print.error(
-        `Amplify AppID: ${inputAmplifyAppId} not found. Please ensure your local profile matches the AWS account or region in which the Amplify app exists.`
+        `Amplify AppID: ${inputAmplifyAppId} not found. Please ensure your local profile matches the AWS account or region in which the Amplify app exists.`,
       );
       context.print.info(e);
       throw e;

@@ -23,6 +23,7 @@ const {
   TRANSFORM_CONFIG_FILE_NAME,
   TRANSFORM_BASE_VERSION,
   CLOUDFORMATION_FILE_NAME,
+  getAppSyncServiceExtraDirectives,
 } = TransformPackage;
 
 const apiCategory = 'api';
@@ -146,45 +147,71 @@ function getTransformerFactory(context, resourceDir, authConfig) {
 async function transformerVersionCheck(context, resourceDir, cloudBackendDirectory, updatedResources, usedDirectives) {
   const versionChangeMessage =
     'The default behavior for @auth has changed in the latest version of Amplify\nRead here for details: https://aws-amplify.github.io/docs/cli-toolchain/graphql#authorizing-subscriptions';
+  const warningESMessage =
+    'The behavior for @searchable has changed after version 4.14.1.\nRead here for details: https://aws-amplify.github.io/docs/cli-toolchain/graphql#migration-warning';
   const checkVersionExist = config => config && config.Version;
+  const checkESWarningExists = config => config && config.ElasticsearchWarning;
+  let writeToConfig = false;
 
   // this is where we check if there is a prev version of the transformer being used
   // by using the transformer.conf.json file
   const cloudTransformerConfig = await readTransformerConfiguration(cloudBackendDirectory);
   const cloudVersionExist = checkVersionExist(cloudTransformerConfig);
+  const cloudWarningExist = checkESWarningExists(cloudTransformerConfig);
 
   // check local resource if the question has been answered before
   const localTransformerConfig = await readTransformerConfiguration(resourceDir);
   const localVersionExist = checkVersionExist(localTransformerConfig);
+  const localWarningExist = checkESWarningExists(localTransformerConfig);
 
   // if we already asked the confirmation question before at a previous push
   // or during current operations we should not ask again.
   const showPrompt = !(cloudVersionExist || localVersionExist);
+  const showWarning = !(cloudWarningExist || localWarningExist);
 
   const resources = updatedResources.filter(resource => resource.service === 'AppSync');
-
-  if (showPrompt && usedDirectives.includes('auth') && resources.length > 0) {
-    if (context.exeInfo && context.exeInfo.inputParams && context.exeInfo.inputParams.yes) {
-      context.print.warning(`\n${versionChangeMessage}\n`);
-    } else {
-      const response = await inquirer.prompt({
-        name: 'transformerConfig',
-        type: 'confirm',
-        message: `${versionChangeMessage}\nDo you wish to continue?`,
-        default: false,
-      });
-      if (!response.transformerConfig) {
-        process.exit(0);
-      }
+  if (resources.length > 0) {
+    if (showPrompt && usedDirectives.includes('auth')) {
+      await warningMessage(context, versionChangeMessage);
+    }
+    if (showWarning && usedDirectives.includes('searchable')) {
+      await warningMessage(context, warningESMessage);
     }
   }
+
+  // searchable warning flag
 
   // Only touch the file if it misses the Version property
   // Always set to the base version, to not to break existing projects when coming
   // from an older version of the CLI.
   if (!localTransformerConfig.Version) {
     localTransformerConfig.Version = TRANSFORM_BASE_VERSION;
+    writeToConfig = true;
+  }
+  // Add the warning as noted in the elasticsearch
+  if (!localTransformerConfig.warningESMessage) {
+    localTransformerConfig.ElasticsearchWarning = true;
+    writeToConfig = true;
+  }
+  if (writeToConfig) {
     await writeTransformerConfiguration(resourceDir, localTransformerConfig);
+  }
+}
+
+async function warningMessage(context, warningMessage) {
+  if (context.exeInfo && context.exeInfo.inputParams && context.exeInfo.inputParams.yes) {
+    context.print.warning(`\n${warningMessage}\n`);
+  } else {
+    context.print.warning(`\n${warningMessage}\n`);
+    const response = await inquirer.prompt({
+      name: 'transformerConfig',
+      type: 'confirm',
+      message: `Do you wish to continue?`,
+      default: false,
+    });
+    if (!response.transformerConfig) {
+      process.exit(0);
+    }
   }
 }
 
@@ -426,6 +453,7 @@ async function transformGraphQLSchema(context, options) {
     rootStackFileName: 'cloudformation-template.json',
     currentCloudBackendDirectory: previouslyDeployedBackendDir,
     disableResolverOverrides: options.disableResolverOverrides,
+    minify: options.minify,
   };
   context.print.info(`Building API Project...`);
   const transformerOutput = await TransformPackage.buildAPIProject(buildConfig);
@@ -489,9 +517,12 @@ async function getPreviousDeploymentRootKey(previouslyDeployedBackendDir) {
 
 async function getDirectiveDefinitions(context, resourceDir) {
   const transformList = await getTransformerFactory(context, resourceDir)(true);
-  return transformList
+  const appSynDirectives = getAppSyncServiceExtraDirectives();
+  const transformDirectives = transformList
     .map(transformPluginInst => [transformPluginInst.directive, ...transformPluginInst.typeDefinitions].map(node => print(node)).join('\n'))
     .join('\n');
+
+  return [appSynDirectives, transformDirectives].join('\n');
 }
 /**
  * Check if storage exists in the project if not return undefined

@@ -1,38 +1,38 @@
 {
   "name": "amplify-codegen",
-  "version": "2.4.0",
+  "version": "2.15.6",
   "description": "amplify code generator",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aws-amplify/amplify-cli.git",
+    "directory": "packages/amplify-codegen"
+  },
+  "author": "Amazon Web Services",
+  "license": "Apache-2.0",
   "main": "src/index.js",
+  "keywords": [
+    "graphql",
+    "appsync",
+    "aws"
+  ],
   "scripts": {
-    "lint": "eslint src/** tests/**",
-    "lint-fix": "eslint src/** tests/** --fix",
     "test": "jest",
     "test-ci": "jest --ci -i",
     "test-watch": "jest --watch"
   },
-  "author": "Amazon Web Services",
-  "license": "Apache-2.0",
   "dependencies": {
-    "@graphql-codegen/core": "^1.8.3",
-    "amplify-codegen-appsync-model-plugin": "1.4.0",
-    "amplify-graphql-docs-generator": "2.0.5",
-    "amplify-graphql-types-generator": "2.0.5",
-    "aws-appsync-codegen": "^0.17.4",
-    "chalk": "^2.4.2",
-    "fs-extra": "^8.1.0",
-    "glob-all": "^3.1.0",
-    "graphql": "^0.13.2",
-    "graphql-config": "^2.1.0",
-    "inquirer": "^6.5.1",
-    "ora": "^3.4.0",
-    "underscore": "^1.9.1",
-    "upath": "^1.2.0"
-  },
-  "devDependencies": {
-    "eslint": "^4.19.1",
-    "eslint-config-airbnb-base": "^12.1.0",
-    "eslint-plugin-import": "^2.12.0",
-    "jest": "^23.0.0"
+    "@graphql-codegen/core": "^X",
+    "amplify-codegen-appsync-model-plugin": "^X",
+    "amplify-graphql-docs-generator": "^X",
+    "amplify-graphql-types-generator": "^X",
+    "chalk": "^X",
+    "fs-extra": "^X",
+    "glob-all": "^X",
+    "graphql": "^14.0.0",
+    "graphql-config": "^X",
+    "inquirer": "^X",
+    "ora": "^X",
+    "slash": "^X"
   },
   "jest": {
     "collectCoverage": true,

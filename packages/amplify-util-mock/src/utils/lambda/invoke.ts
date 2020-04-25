@@ -10,7 +10,7 @@ export function invoke(options) {
         env: options.environment || {},
       });
       lambdaFn.on('message', msg => {
-        const result = JSON.parse(msg);
+        const result = JSON.parse(msg.toString());
         if (result.error) {
           reject(result.error);
         }

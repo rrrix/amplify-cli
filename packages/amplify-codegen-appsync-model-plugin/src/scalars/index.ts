@@ -9,7 +9,7 @@ export const JAVA_SCALAR_MAP: NormalizedScalarsMap = {
   AWSDate: 'java.util.Date',
   AWSDateTime: 'java.util.Date',
   AWSTime: 'java.sql.Time',
-  AWSTimestamp: 'long',
+  AWSTimestamp: 'Long',
   AWSEmail: 'String',
   AWSJSON: 'String',
   AWSURL: 'String',
@@ -54,7 +54,7 @@ export const TYPESCRIPT_SCALAR_MAP: NormalizedScalarsMap = {
 export const METADATA_SCALAR_MAP: NormalizedScalarsMap = {
   ID: 'ID',
   Boolean: 'Boolean',
-  String: 'string',
+  String: 'String',
   AWSDate: 'AWSDate',
   AWSTime: 'AWSTime',
   AWSDateTime: 'AWSDateTime',

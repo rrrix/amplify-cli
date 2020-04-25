@@ -1,0 +1,15 @@
+{
+  "name": "jsonmock",
+  "private": true,
+  "version": "1.0.0",
+  "devDependencies": {
+    "aws-cdk": "^X",
+    "@types/node": "^X",
+    "typescript": "^X"
+  },
+  "dependencies": {
+    "@aws-cdk/aws-lambda": "^X",
+    "@aws-cdk/aws-apigateway": "^X",
+    "@aws-cdk/core": "^X"
+  }
+}

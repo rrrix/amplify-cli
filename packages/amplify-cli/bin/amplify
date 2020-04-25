@@ -3,7 +3,7 @@
 // (un)set stack trace limit for deeply nested function calls
 Error.stackTraceLimit = 100;
 
-require = require('esm')(module);
+require = require('esm')(module, { cache: false });
 
 // pretty-error: Show stack traces with less clutter, easier to read
 // const pe = require('pretty-error');

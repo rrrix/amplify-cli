@@ -1,19 +1,20 @@
 {
-    "compilerOptions": {
-        "target": "ESNext",
-        "module": "commonjs",
-        "sourceMap": true,
-        "outDir": "lib",
-//        "lib": [
-//            "es2015",
-//            "es2016.array.include",
-//            "esnext.asynciterable",
-//            "dom"
-//        ],
-        "declaration": true
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "strict": false,
+    // TODO enable
+    "rootDir": "src",
+    "outDir": "lib"
+  },
+  "references": [
+    {
+      "path": "../graphql-mapping-template"
     },
-    "exclude": [
-        "node_modules",
-        "lib"
-    ]
+    {
+      "path": "../graphql-transformer-common"
+    },
+    {
+      "path": "../graphql-transformer-core"
+    }
+  ]
 }

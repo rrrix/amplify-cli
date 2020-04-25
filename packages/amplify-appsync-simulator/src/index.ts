@@ -1,11 +1,12 @@
 import { Source, GraphQLSchema } from 'graphql';
+import slash from 'slash';
 import { generateResolvers } from './schema';
 import { VelocityTemplate } from './velocity';
 import { getDataLoader, AmplifyAppSyncSimulatorDataLoader } from './data-loader';
 import { AppSyncUnitResolver } from './resolvers';
 import { AppSyncSimulatorServer } from './server';
 export { addDataLoader, removeDataLoader } from './data-loader';
-import { PubSub } from 'graphql-subscriptions';
+import { PubSub, withFilter } from 'graphql-subscriptions';
 import { AmplifySimulatorFunction } from './resolvers/function';
 import { AppSyncPipelineResolver } from './resolvers/pipeline-resolver';
 import {
@@ -15,7 +16,9 @@ import {
   AppSyncSimulatorPipelineResolverConfig,
   AppSyncSimulatorUnitResolverConfig,
   AmplifyAppSyncAPIConfig,
+  AppSyncSimulatorMappingTemplate,
 } from './type-definition';
+import { filterSubscriptions } from './utils/graphql-runner/subscriptions-filter';
 export * from './type-definition';
 
 const DEFAULT_SCHEMA = `
@@ -40,7 +43,7 @@ export class AmplifyAppSyncSimulator {
     serverConfig: AppSyncSimulatorServerConfig = {
       port: 0,
       wsPort: 0,
-    }
+    },
   ) {
     this._serverConfig = serverConfig;
     this._pubsub = new PubSub();
@@ -64,12 +67,17 @@ export class AmplifyAppSyncSimulator {
     const lastDataSources = this.dataSources;
     try {
       this._appSyncConfig = config.appSync;
-      this.mappingTemplates = config.mappingTemplates.reduce((map, template) => {
-        map.set(template.path, new VelocityTemplate(template, this));
+      this.mappingTemplates = (config.mappingTemplates || []).reduce((map, template) => {
+        const normalizedTemplate: AppSyncSimulatorMappingTemplate = { content: template.content };
+        if (template.path) {
+          // Windows path normalization by replacing '\' with '/' as CFN references path with '/'
+          normalizedTemplate.path = slash(template.path);
+        }
+        map.set(normalizedTemplate.path, new VelocityTemplate(normalizedTemplate, this));
         return map;
       }, new Map());
 
-      this.dataSources = config.dataSources.reduce((map, source) => {
+      this.dataSources = (config.dataSources || []).reduce((map, source) => {
         const dataLoader = getDataLoader(source.type);
         map.set(source.name, new dataLoader(source));
         return map;
@@ -85,13 +93,13 @@ export class AmplifyAppSyncSimulator {
               requestMappingTemplateLocation: requestMappingTemplateLocation,
               responseMappingTemplateLocation: responseMappingTemplateLocation,
             },
-            this
-          )
+            this,
+          ),
         );
         return map;
       }, new Map());
 
-      this.resolvers = config.resolvers.reduce((map, resolver) => {
+      this.resolvers = (config.resolvers || []).reduce((map, resolver) => {
         const fieldName = resolver.fieldName;
         const typeName = resolver.typeName;
         const resolveType = resolver.kind;
@@ -156,6 +164,9 @@ export class AmplifyAppSyncSimulator {
 
   get pubsub(): PubSub {
     return this._pubsub;
+  }
+  asyncIterator(trigger: string): AsyncIterator<any> {
+    return withFilter(() => this._pubsub.asyncIterator(trigger), filterSubscriptions)();
   }
 
   get url(): string {

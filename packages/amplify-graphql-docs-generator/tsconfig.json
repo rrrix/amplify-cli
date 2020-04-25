@@ -1,26 +1,16 @@
 {
-    "compilerOptions": {
-        "target": "ESNext",
-        "module": "commonjs",
-        "sourceMap": true,
-        "outDir": "lib",
-        "experimentalDecorators": true,
-        "emitDecoratorMetadata": true,
-        "sourceRoot": "src",
-//        "lib": [
-//            "es2017",
-//            "dom",
-//            "esnext.asynciterable",
-//            "dom"
-//        ],
-        "declaration": true
-    },
-    "exclude": [
-        "node_modules",
-        "lib",
-        "__tests__"
-    ],
-    "include": [
-        "src/"
-    ]
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "lib",
+    "sourceRoot": "src",
+    "strict": false
+  },
+  "exclude": [
+    "node_modules",
+    "lib",
+    "__tests__"
+  ],
+  "include": [
+    "src/"
+  ]
 }

@@ -1,18 +1,16 @@
 {
-    "compilerOptions": {
-        "target": "ESNext",
-        "module": "commonjs",
-        "sourceMap": true,
-        "outDir": "lib",
-//        "lib": [
-//            "es2015",
-//            "esnext.asynciterable",
-//            "dom"
-//        ],
-        "declaration": true
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "strict": false, // TODO enable
+    "rootDir": "src",
+    "target": "ESNext",
+    "module": "commonjs",
+    "sourceMap": true,
+    "outDir": "lib",
+    "declaration": true
     },
     "exclude": [
         "node_modules",
         "lib"
     ]
-}
+  }

@@ -23,8 +23,10 @@ export interface ProjectOptions {
   currentCloudBackendDirectory: string;
   rootStackFileName?: string;
   dryRun?: boolean;
+  disableFunctionOverrides?: boolean;
   disableResolverOverrides?: boolean;
   buildParameters?: Object;
+  minify?: boolean;
 }
 
 export async function buildProject(opts: ProjectOptions) {
@@ -33,7 +35,13 @@ export async function buildProject(opts: ProjectOptions) {
   const builtProject = await _buildProject(opts);
 
   if (opts.projectDirectory && !opts.dryRun) {
-    await writeDeploymentToDisk(builtProject, path.join(opts.projectDirectory, 'build'), opts.rootStackFileName, opts.buildParameters);
+    await writeDeploymentToDisk(
+      builtProject,
+      path.join(opts.projectDirectory, 'build'),
+      opts.rootStackFileName,
+      opts.buildParameters,
+      opts.minify,
+    );
     if (opts.currentCloudBackendDirectory) {
       const lastBuildPath = path.join(opts.currentCloudBackendDirectory, 'build');
       const thisBuildPath = path.join(opts.projectDirectory, 'build');
@@ -152,7 +160,7 @@ async function ensureMissingStackMappings(config: ProjectOptions) {
               missingStackMappings[resourceId] = stackName;
             }
           }
-          const outputIdsInStack = Object.keys(lastDeployedStack.Outputs);
+          const outputIdsInStack = Object.keys(lastDeployedStack.Outputs || {});
           for (const outputId of outputIdsInStack) {
             if (stackMapping[outputId] && stackName !== stackMapping[outputId]) {
               missingStackMappings[outputId] = stackName;
@@ -169,7 +177,7 @@ async function ensureMissingStackMappings(config: ProjectOptions) {
           missingStackMappings[resourceId] = 'root';
         }
       }
-      const outputIdsInStack = Object.keys(lastDeployedStack.Outputs);
+      const outputIdsInStack = Object.keys(lastDeployedStack.Outputs || {});
       for (const outputId of outputIdsInStack) {
         if (stackMapping[outputId] && 'root' !== stackMapping[outputId]) {
           missingStackMappings[outputId] = 'root';
@@ -191,6 +199,13 @@ async function ensureMissingStackMappings(config: ProjectOptions) {
  * Merge user config on top of transform output when needed.
  */
 function mergeUserConfigWithTransformOutput(userConfig: Partial<DeploymentResources>, transformOutput: DeploymentResources) {
+  // Override user defined functions.
+  const userFunctions = userConfig.functions || {};
+  const transformFunctions = transformOutput.functions;
+  for (const userFunction of Object.keys(userFunctions)) {
+    transformFunctions[userFunction] = userConfig.functions[userFunction];
+  }
+
   // Override user defined resolvers.
   const userResolvers = userConfig.resolvers || {};
   const transformResolvers = transformOutput.resolvers;
@@ -221,7 +236,7 @@ function mergeUserConfigWithTransformOutput(userConfig: Partial<DeploymentResour
       ...acc,
       [k]: Fn.Ref(k),
     }),
-    {}
+    {},
   );
   // customStackParams is a map that will be passed as the "parameters" value
   // to any nested stacks.
@@ -265,7 +280,7 @@ function mergeUserConfigWithTransformOutput(userConfig: Partial<DeploymentResour
         ...acc,
         [k]: customStackParams[k],
       }),
-      {}
+      {},
     );
 
     transformStacks[userStack] = userDefinedStack;
@@ -343,7 +358,8 @@ async function writeDeploymentToDisk(
   deployment: DeploymentResources,
   directory: string,
   rootStackFileName: string = 'rootStack.json',
-  buildParameters: Object
+  buildParameters: Object,
+  minify = false,
 ) {
   const prepareDirectories = async () => {
     // Delete the last deployments resources.
@@ -398,7 +414,11 @@ async function writeDeploymentToDisk(
         const fullStackPath = path.normalize(stackRootPath + '/' + fullFileName);
         let stackString: any = deployment.stacks[stackFileName];
         stackString =
-          typeof stackString === 'string' ? deployment.stacks[stackFileName] : JSON.stringify(deployment.stacks[stackFileName], null, 4);
+          typeof stackString === 'string'
+        ? deployment.stacks[stackFileName]
+        : minify
+        ? JSON.stringify(deployment.stacks[stackFileName])
+        : JSON.stringify(deployment.stacks[stackFileName], null, 4);
         await fs.writeFile(fullStackPath, stackString);
         flipJsonToYaml(fullStackPath);
       })
@@ -423,7 +443,7 @@ async function writeDeploymentToDisk(
   const writeRootStack = async () => {
     const rootStack = deployment.rootStack;
     const rootStackPath = path.normalize(directory + `/${rootStackFileName}`);
-    await fs.writeFile(rootStackPath, JSON.stringify(rootStack, null, 4));
+    await fs.writeFile(rootStackPath, JSON.stringify(rootStack));
 
     flipJsonToYaml(rootStackPath);
   };

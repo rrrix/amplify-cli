@@ -102,7 +102,8 @@ function checkFieldsAgainstIndex(
   parentFields: ReadonlyArray<FieldDefinitionNode>,
   relatedTypeFields: ReadonlyArray<FieldDefinitionNode>,
   inputFieldNames: string[],
-  keySchema: KeySchema[]
+  keySchema: KeySchema[],
+  field: Readonly<FieldDefinitionNode>,
 ): void {
   const hashAttributeName = keySchema[0].AttributeName;
   const tablePKType = getFieldType(relatedTypeFields, String(hashAttributeName));
@@ -115,8 +116,16 @@ function checkFieldsAgainstIndex(
   if (numFields > keySchema.length && keySchema.length !== 2) {
     throw new InvalidDirectiveError('Too many fields passed in to @connection directive.');
   }
+  // when sort key is passed, ensure that the length of composite sort key matches the length of the fields passed
+  if (numFields > 1) {
+    const querySortFields = inputFieldNames.slice(1);
+    const tableSortFields = String(keySchema[1].AttributeName).split(ModelResourceIDs.ModelCompositeKeySeparator());
+    if (querySortFields.length !== tableSortFields.length) {
+      throw new InvalidDirectiveError(`Invalid @connection directive  ${field.name.value}. fields does not accept partial sort key`);
+    }
+  }
   if (numFields === 2) {
-    const sortAttributeName = keySchema[1].AttributeName;
+    const sortAttributeName = String(keySchema[1].AttributeName).split(ModelResourceIDs.ModelCompositeKeySeparator())[0];
     const tableSKType = getFieldType(relatedTypeFields, String(sortAttributeName));
     const querySKType = getFieldType(parentFields, inputFieldNames[1]);
 
@@ -133,7 +142,9 @@ function checkFieldsAgainstIndex(
     // table or index being queried.
     querySortKeyTypes.forEach((fieldType, index) => {
       if (getBaseType(fieldType) !== getBaseType(tableSortKeyTypes[index])) {
-        throw new InvalidDirectiveError(`${querySortFields[index]} field is not of type ${getBaseType(tableSortKeyTypes[index])}`);
+        throw new InvalidDirectiveError(
+          `${querySortFields[index]} field is not of type ${getBaseType(tableSortKeyTypes[index])} arguments`,
+        );
       }
     });
   }
@@ -160,7 +171,7 @@ export class ModelConnectionTransformer extends Transformer {
           limit: Int
           fields: [String!]
         ) on FIELD_DEFINITION
-      `
+      `,
     );
     this.resources = new ResourceFactory();
   }
@@ -180,7 +191,7 @@ export class ModelConnectionTransformer extends Transformer {
     parent: ObjectTypeDefinitionNode | InterfaceTypeDefinitionNode,
     field: FieldDefinitionNode,
     directive: DirectiveNode,
-    ctx: TransformerContext
+    ctx: TransformerContext,
   ): void => {
     const parentTypeName = parent.name.value;
     const fieldName = field.name.value;
@@ -194,7 +205,7 @@ export class ModelConnectionTransformer extends Transformer {
 
     const relatedTypeName = getBaseType(field.type);
     const relatedType = ctx.inputDocument.definitions.find(
-      d => d.kind === Kind.OBJECT_TYPE_DEFINITION && d.name.value === relatedTypeName
+      d => d.kind === Kind.OBJECT_TYPE_DEFINITION && d.name.value === relatedTypeName,
     ) as ObjectTypeDefinitionNode | undefined;
     if (!relatedType) {
       throw new InvalidDirectiveError(`Could not find an object type named ${relatedTypeName}.`);
@@ -233,7 +244,7 @@ export class ModelConnectionTransformer extends Transformer {
 
     if (connectionName && !associatedConnectionField) {
       throw new InvalidDirectiveError(
-        `Found one half of connection "${connectionName}" at ${parentTypeName}.${fieldName} but no related field on type ${relatedTypeName}`
+        `Found one half of connection "${connectionName}" at ${parentTypeName}.${fieldName} but no related field on type ${relatedTypeName}`,
       );
     }
 
@@ -256,7 +267,7 @@ export class ModelConnectionTransformer extends Transformer {
       if (!isScalar(associatedSortField.type) || sortType === STANDARD_SCALARS.Boolean) {
         throw new InvalidDirectiveError(
           `sortField "${associatedSortFieldName}" is of type "${sortType}". ` +
-            `It should be a scalar that maps to a DynamoDB "String", "Number", or "Binary"`
+            `It should be a scalar that maps to a DynamoDB "String", "Number", or "Binary"`,
         );
       }
     }
@@ -306,7 +317,7 @@ export class ModelConnectionTransformer extends Transformer {
         idFieldName,
         // If there is a sort field for this connection query then use
         sortKeyInfo,
-        limit
+        limit,
       );
       ctx.setResource(ResolverResourceIDs.ResolverResourceID(parentTypeName, fieldName), queryResolver);
 
@@ -320,7 +331,7 @@ export class ModelConnectionTransformer extends Transformer {
       // Cannot assume the required type of the field
       if (associatedSortFieldName && !associatedSortField) {
         throw new InvalidDirectiveError(
-          `sortField "${associatedSortFieldName}" not found on type "${parent.name.value}", other half of connection "${connectionName}".`
+          `sortField "${associatedSortFieldName}" not found on type "${parent.name.value}", other half of connection "${connectionName}".`,
         );
       }
 
@@ -345,7 +356,7 @@ export class ModelConnectionTransformer extends Transformer {
         fieldName,
         relatedTypeName,
         connectionAttributeName,
-        idFieldName
+        idFieldName,
       );
       ctx.setResource(ResolverResourceIDs.ResolverResourceID(parentTypeName, fieldName), getResolver);
 
@@ -390,7 +401,7 @@ export class ModelConnectionTransformer extends Transformer {
         connectionName,
         idFieldName,
         sortKeyInfo,
-        limit
+        limit,
       );
       ctx.setResource(ResolverResourceIDs.ResolverResourceID(parentTypeName, fieldName), queryResolver);
 
@@ -431,14 +442,14 @@ export class ModelConnectionTransformer extends Transformer {
 
         if (!relatedSortField) {
           throw new InvalidDirectiveError(
-            `sortField "${sortFieldName}" requires a primary @key on type "${relatedTypeName}" with a sort key that was not found.`
+            `sortField "${sortFieldName}" requires a primary @key on type "${relatedTypeName}" with a sort key that was not found.`,
           );
         }
 
         const sortField = parent.fields.find(f => f.name.value === sortFieldName);
 
         if (!sortField) {
-          throw new InvalidDirectiveError(`sortField with name "${sortFieldName} cannot be found on tyoe: ${parent.name.value}`);
+          throw new InvalidDirectiveError(`sortField with name "${sortFieldName} cannot be found on type: ${parent.name.value}`);
         }
 
         const relatedSortFieldType = getBaseType(relatedSortField.type);
@@ -447,7 +458,7 @@ export class ModelConnectionTransformer extends Transformer {
         if (relatedSortFieldType !== sortFieldType) {
           throw new InvalidDirectiveError(
             `sortField "${relatedSortField.name.value}" on type "${relatedTypeName}" is not matching the ` +
-              `type of field "${sortFieldName}" on type "${parentTypeName}"`
+              `type of field "${sortFieldName}" on type "${parentTypeName}"`,
           );
         }
 
@@ -479,7 +490,7 @@ export class ModelConnectionTransformer extends Transformer {
         relatedTypeName,
         connectionAttributeName,
         idFieldName,
-        sortFieldInfo
+        sortFieldInfo,
       );
       ctx.setResource(ResolverResourceIDs.ResolverResourceID(parentTypeName, fieldName), getResolver);
 
@@ -516,7 +527,7 @@ export class ModelConnectionTransformer extends Transformer {
     parent: ObjectTypeDefinitionNode | InterfaceTypeDefinitionNode,
     field: FieldDefinitionNode,
     directive: DirectiveNode,
-    ctx: TransformerContext
+    ctx: TransformerContext,
   ): void => {
     const parentTypeName = parent.name.value;
     const fieldName = field.name.value;
@@ -530,7 +541,7 @@ export class ModelConnectionTransformer extends Transformer {
     // Check that related type exists and that the connected object is annotated with @model.
     const relatedTypeName = getBaseType(field.type);
     const relatedType = ctx.inputDocument.definitions.find(
-      d => d.kind === Kind.OBJECT_TYPE_DEFINITION && d.name.value === relatedTypeName
+      d => d.kind === Kind.OBJECT_TYPE_DEFINITION && d.name.value === relatedTypeName,
     ) as ObjectTypeDefinitionNode | undefined;
 
     // Get Child object's table.
@@ -553,7 +564,7 @@ export class ModelConnectionTransformer extends Transformer {
     // If no index is provided use the default index for the related model type and
     // check that the query fields match the PK/SK of the table. Else confirm that index exists.
     if (!args.keyName) {
-      checkFieldsAgainstIndex(parent.fields, relatedType.fields, args.fields, <KeySchema[]>tableResource.Properties.KeySchema);
+      checkFieldsAgainstIndex(parent.fields, relatedType.fields, args.fields, <KeySchema[]>tableResource.Properties.KeySchema, field);
     } else {
       index =
         (tableResource.Properties.GlobalSecondaryIndexes
@@ -566,8 +577,10 @@ export class ModelConnectionTransformer extends Transformer {
         throw new InvalidDirectiveError(`Key ${args.keyName} does not exist for model ${relatedTypeName}`);
       }
 
+      // check the arity
+
       // Confirm that types of query fields match types of PK/SK of the index being queried.
-      checkFieldsAgainstIndex(parent.fields, relatedType.fields, args.fields, <KeySchema[]>index.KeySchema);
+      checkFieldsAgainstIndex(parent.fields, relatedType.fields, args.fields, <KeySchema[]>index.KeySchema, field);
     }
 
     // If the related type is not a list, the index has to be the default index and the fields provided must match the PK/SK of the index.
@@ -575,7 +588,7 @@ export class ModelConnectionTransformer extends Transformer {
       if (args.keyName) {
         // tslint:disable-next-line: max-line-length
         throw new InvalidDirectiveError(
-          `Connection is to a single object but the keyName ${args.keyName} was provided which does not reference the default table.`
+          `Connection is to a single object but the keyName ${args.keyName} was provided which does not reference the default table.`,
         );
       }
 
@@ -585,7 +598,7 @@ export class ModelConnectionTransformer extends Transformer {
         fieldName,
         relatedTypeName,
         args.fields,
-        <KeySchema[]>tableResource.Properties.KeySchema
+        <KeySchema[]>tableResource.Properties.KeySchema,
       );
 
       ctx.setResource(ResolverResourceIDs.ResolverResourceID(parentTypeName, fieldName), getResolver);
@@ -598,7 +611,7 @@ export class ModelConnectionTransformer extends Transformer {
         relatedType,
         args.fields,
         keySchema,
-        index ? String(index.IndexName) : undefined
+        index ? String(index.IndexName) : undefined,
       );
 
       ctx.setResource(ResolverResourceIDs.ResolverResourceID(parentTypeName, fieldName), queryResolver);
@@ -657,7 +670,7 @@ export class ModelConnectionTransformer extends Transformer {
   private generateFilterAndKeyConditionInputs(
     ctx: TransformerContext,
     field: ObjectTypeDefinitionNode | InterfaceTypeDefinitionNode,
-    sortKeyInfo?: { fieldName: string; typeName: SortKeyFieldInfoTypeName }
+    sortKeyInfo?: { fieldName: string; typeName: SortKeyFieldInfoTypeName },
   ): void {
     const scalarFilters = makeScalarFilterInputs(this.supportsConditions(ctx));
     for (const filter of scalarFilters) {
@@ -692,7 +705,7 @@ export class ModelConnectionTransformer extends Transformer {
     parent: ObjectTypeDefinitionNode | InterfaceTypeDefinitionNode,
     field: FieldDefinitionNode,
     returnType: ObjectTypeDefinitionNode | InterfaceTypeDefinitionNode,
-    sortKeyInfo?: { fieldName: string; typeName: SortKeyFieldInfoTypeName; model?: string; keyName?: string }
+    sortKeyInfo?: { fieldName: string; typeName: SortKeyFieldInfoTypeName; model?: string; keyName?: string },
   ) {
     this.generateModelXConnectionType(ctx, returnType);
 

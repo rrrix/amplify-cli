@@ -1,18 +1,20 @@
 {
-    "compilerOptions": {
-        "target": "ESNext",
-        "module": "commonjs",
-        "sourceMap": true,
-        "outDir": "lib",
-//        "lib": [
-//            "es2016.array.include",
-//            "esnext.asynciterable",
-//            "dom"
-//        ],
-        "declaration": true
-    },
-    "exclude": [
-        "node_modules",
-        "lib"
-    ]
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "commonjs",
+    "sourceMap": true,
+    "outDir": "lib",
+    "declaration": true,
+    "strict": false, // TODO enable
+    "rootDir": "src"
+  },
+  "references": [
+    {"path": "../graphql-connection-transformer"},
+    {"path": "../graphql-dynamodb-transformer"},
+    {"path": "../graphql-elasticsearch-transformer"},
+    {"path": "../graphql-mapping-template"},
+    {"path": "../graphql-transformer-common"},
+    {"path": "../graphql-transformer-core"}
+  ]
 }

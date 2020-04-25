@@ -1,39 +1,38 @@
-import * as nexpect from 'nexpect';
-import { updateSchema } from '../utils';
+import { nspawn as spawn, ExecutionContext, KEY_DOWN_ARROW } from 'amplify-e2e-core';
 import * as fs from 'fs-extra';
-
-import { getCLIPath, isCI } from '../utils';
+import { getCLIPath, updateSchema } from '../utils';
+import { nodeJSTemplateChoices, selectRuntime } from './function';
+import { singleSelect } from '../utils/selectors';
 
 function getSchemaPath(schemaName: string): string {
   return `${__dirname}/../../schemas/${schemaName}`;
 }
 
-export function addApiWithoutSchema(cwd: string, verbose: boolean = !isCI()) {
+export function addApiWithoutSchema(cwd: string) {
   return new Promise((resolve, reject) => {
-    nexpect
-      .spawn(getCLIPath(), ['add', 'api'], { cwd, stripColors: true, verbose })
+    spawn(getCLIPath(), ['add', 'api'], { cwd, stripColors: true })
       .wait('Please select from one of the below mentioned services:')
-      .sendline('\r')
+      .sendCarriageReturn()
       .wait('Provide API name:')
-      .sendline('\r')
+      .sendCarriageReturn()
       .wait(/.*Choose the default authorization type for the API.*/)
-      .sendline('\r')
+      .sendCarriageReturn()
       .wait(/.*Enter a description for the API key.*/)
-      .sendline('\r')
+      .sendCarriageReturn()
       .wait(/.*After how many days from now the API key should expire.*/)
-      .sendline('\r')
+      .sendCarriageReturn()
       .wait(/.*Do you want to configure advanced settings for the GraphQL API.*/)
-      .sendline('\r')
+      .sendCarriageReturn()
       .wait('Do you have an annotated GraphQL schema?')
-      .sendline('n')
+      .sendLine('n')
       .wait('Do you want a guided schema creation')
-      .sendline('y')
+      .sendLine('y')
       .wait('What best describes your project')
-      .sendline('\r')
+      .sendCarriageReturn()
       .wait('Do you want to edit the schema now?')
-      .sendline('n')
+      .sendLine('n')
       .wait(
-        '"amplify publish" will build all your local backend and frontend resources (if you have hosting category added) and provision it in the cloud'
+        '"amplify publish" will build all your local backend and frontend resources (if you have hosting category added) and provision it in the cloud',
       )
       .run((err: Error) => {
         if (!err) {
@@ -45,29 +44,67 @@ export function addApiWithoutSchema(cwd: string, verbose: boolean = !isCI()) {
   });
 }
 
-export function addApiWithSchema(cwd: string, schemaFile: string, verbose: boolean = !isCI()) {
+export function addApiWithSchema(cwd: string, schemaFile: string) {
   const schemaPath = getSchemaPath(schemaFile);
   return new Promise((resolve, reject) => {
-    nexpect
-      .spawn(getCLIPath(), ['add', 'api'], { cwd, stripColors: true, verbose })
+    spawn(getCLIPath(), ['add', 'api'], { cwd, stripColors: true })
       .wait('Please select from one of the below mentioned services:')
-      .sendline('\r')
+      .sendCarriageReturn()
       .wait('Provide API name:')
-      .sendline('\r')
+      .sendCarriageReturn()
       .wait(/.*Choose the default authorization type for the API.*/)
-      .sendline('\r')
+      .sendCarriageReturn()
       .wait(/.*Enter a description for the API key.*/)
-      .sendline('\r')
+      .sendCarriageReturn()
       .wait(/.*After how many days from now the API key should expire.*/)
-      .sendline('\r')
+      .sendCarriageReturn()
       .wait(/.*Do you want to configure advanced settings for the GraphQL API.*/)
-      .sendline('\r')
+      .sendCarriageReturn()
       .wait('Do you have an annotated GraphQL schema?')
-      .sendline('y')
+      .sendLine('y')
       .wait('Provide your schema file path:')
-      .sendline(schemaPath)
+      .sendLine(schemaPath)
       .wait(
-        '"amplify publish" will build all your local backend and frontend resources (if you have hosting category added) and provision it in the cloud'
+        '"amplify publish" will build all your local backend and frontend resources (if you have hosting category added) and provision it in the cloud',
+      )
+      .run((err: Error) => {
+        if (!err) {
+          resolve();
+        } else {
+          reject(err);
+        }
+      });
+  });
+}
+
+export function addApiWithSchemaAndConflictDetection(cwd: string, schemaFile: string) {
+  const schemaPath = getSchemaPath(schemaFile);
+  return new Promise((resolve, reject) => {
+    spawn(getCLIPath(), ['add', 'api'], { cwd, stripColors: true })
+      .wait('Please select from one of the below mentioned services:')
+      .sendCarriageReturn()
+      .wait('Provide API name:')
+      .sendCarriageReturn()
+      .wait(/.*Choose the default authorization type for the API.*/)
+      .sendCarriageReturn()
+      .wait(/.*Enter a description for the API key.*/)
+      .sendCarriageReturn()
+      .wait(/.*After how many days from now the API key should expire.*/)
+      .sendCarriageReturn()
+      .wait(/.*Do you want to configure advanced settings for the GraphQL API.*/)
+      .sendLine(KEY_DOWN_ARROW) // Down
+      .wait(/.*Configure additional auth types.*/)
+      .sendLine('n')
+      .wait(/.*Configure conflict detection.*/)
+      .sendLine('y')
+      .wait(/.*Select the default resolution strategy.*/)
+      .sendCarriageReturn()
+      .wait(/.*Do you have an annotated GraphQL schema.*/)
+      .sendLine('y')
+      .wait('Provide your schema file path:')
+      .sendLine(schemaPath)
+      .wait(
+        '"amplify publish" will build all your local backend and frontend resources (if you have hosting category added) and provision it in the cloud',
       )
       .run((err: Error) => {
         if (!err) {
@@ -85,44 +122,45 @@ export function updateApiSchema(cwd: string, projectName: string, schemaName: st
   updateSchema(cwd, projectName, schemaText);
 }
 
-export function updateApiWithMultiAuth(cwd: string, settings: any, verbose: boolean = !isCI()) {
+export function updateApiWithMultiAuth(cwd: string, settings: any) {
   return new Promise((resolve, reject) => {
-    nexpect
-      .spawn(getCLIPath(), ['update', 'api'], { cwd, stripColors: true, verbose })
+    spawn(getCLIPath(), ['update', 'api'], { cwd, stripColors: true })
       .wait('Please select from one of the below mentioned services:')
-      .sendline('')
+      .sendCarriageReturn()
+      .wait('Select from the options below')
+      .sendCarriageReturn()
       .wait(/.*Choose the default authorization type for the API.*/)
-      .sendline('')
+      .sendCarriageReturn()
       .wait(/.*Enter a description for the API key.*/)
-      .sendline('description')
+      .sendLine('description')
       .wait(/.*After how many days from now the API key should expire.*/)
-      .sendline('300')
+      .sendLine('300')
       .wait(/.*Do you want to configure advanced settings for the GraphQL API.*/)
-      .sendline('\x1b[B') // Down
+      .sendLine(KEY_DOWN_ARROW) // Down
       .wait(/.*Configure additional auth types.*/)
-      .sendline('y')
+      .sendLine('y')
       .wait(/.*Choose the additional authorization types you want to configure for the API.*/)
-      .sendline('a\r') // All items
+      .sendLine('a\r') // All items
       // Cognito
       .wait(/.*Do you want to use the default authentication and security configuration.*/)
-      .sendline('')
+      .sendCarriageReturn()
       .wait('How do you want users to be able to sign in?')
-      .sendline('')
+      .sendCarriageReturn()
       .wait('Do you want to configure advanced settings?')
-      .sendline('')
+      .sendCarriageReturn()
       // OIDC
       .wait(/.*Enter a name for the OpenID Connect provider:.*/)
-      .sendline('myoidcprovider')
+      .sendLine('myoidcprovider')
       .wait(/.*Enter the OpenID Connect provider domain \(Issuer URL\).*/)
-      .sendline('https://facebook.com/')
+      .sendLine('https://facebook.com/')
       .wait(/.*Enter the Client Id from your OpenID Client Connect application.*/)
-      .sendline('clientId')
+      .sendLine('clientId')
       .wait(/.*Enter the number of milliseconds a token is valid after being issued to a user.*/)
-      .sendline('1000')
+      .sendLine('1000')
       .wait(/.*Enter the number of milliseconds a token is valid after being authenticated.*/)
-      .sendline('2000')
+      .sendLine('2000')
       .wait('Configure conflict detection?')
-      .sendline('n')
+      .sendLine('n')
       .wait(/.*Successfully updated resource.*/)
       .sendEof()
       .run((err: Error) => {
@@ -132,5 +170,111 @@ export function updateApiWithMultiAuth(cwd: string, settings: any, verbose: bool
           reject(err);
         }
       });
+  });
+}
+
+export function updateAPIWithResolutionStrategy(cwd: string, settings: any) {
+  return new Promise((resolve, reject) => {
+    spawn(getCLIPath(), ['update', 'api'], { cwd, stripColors: true })
+      .wait('Please select from one of the below mentioned services:')
+      .sendCarriageReturn()
+      .wait('Select from the options below')
+      .sendCarriageReturn()
+      .wait(/.*Choose the default authorization type for the API.*/)
+      .sendCarriageReturn()
+      .wait(/.*Enter a description for the API key.*/)
+      .sendCarriageReturn()
+      .wait(/.*After how many days from now the API key should expire.*/)
+      .sendCarriageReturn()
+      .wait(/.*Do you want to configure advanced settings for the GraphQL API.*/)
+      .sendLine(KEY_DOWN_ARROW) // Down
+      .wait(/.*Configure additional auth types.*/)
+      .sendLine('n')
+      .wait(/.*Configure conflict detection.*/)
+      .sendLine('y')
+      .wait(/.*Select the default resolution strategy.*/)
+      .sendLine(KEY_DOWN_ARROW) // Down
+      .wait(/.*Do you want to override default per model settings.*/)
+      .sendLine('n')
+      .wait(/.*Successfully updated resource.*/)
+      .sendEof()
+      .run((err: Error) => {
+        if (!err) {
+          resolve();
+        } else {
+          reject(err);
+        }
+      });
+  });
+}
+
+// Either settings.existingLambda or settings.isCrud is required
+export function addRestApi(cwd: string, settings: any) {
+  return new Promise((resolve, reject) => {
+    if (!('existingLambda' in settings) && !('isCrud' in settings)) {
+      reject('Missing property in settings object in addRestApi()');
+    } else {
+      let chain = spawn(getCLIPath(), ['add', 'api'], { cwd, stripColors: true })
+        .wait('Please select from one of the below mentioned services')
+        .send(KEY_DOWN_ARROW)
+        .sendCarriageReturn() // REST
+        .wait('Provide a friendly name for your resource to be used as a label for this category in the project')
+        .sendCarriageReturn()
+        .wait('Provide a path')
+        .sendCarriageReturn()
+        .wait('Choose a lambda source');
+
+      if (settings.existingLambda) {
+        chain
+          .send(KEY_DOWN_ARROW)
+          .sendCarriageReturn() // Existing lambda
+          .wait('Choose the Lambda function to invoke by this path')
+          .sendCarriageReturn(); // Pick first one
+      } else {
+        chain
+          .sendCarriageReturn() // Create new Lambda function
+          .wait('Provide a friendly name for your resource to be used as a label for this category in the project')
+          .sendCarriageReturn()
+          .wait('Provide the AWS Lambda function name')
+          .sendCarriageReturn();
+
+        selectRuntime(chain, 'nodejs');
+
+        const templateName = settings.isCrud
+          ? 'CRUD function for DynamoDB (Integration with API Gateway)'
+          : 'Serverless ExpressJS function (Integration with API Gateway)';
+        singleSelect(chain.wait('Choose the function template that you want to use'), templateName, nodeJSTemplateChoices);
+
+        if (settings.isCrud) {
+          chain
+            .wait('Choose a DynamoDB data source option')
+            .sendCarriageReturn() // Use DDB table configured in current project
+            .wait('Choose from one of the already configured DynamoDB tables')
+            .sendCarriageReturn(); // Use first one in the list
+        }
+
+        chain
+          .wait('Do you want to access other resources created in this project from your Lambda function')
+          .sendLine('n')
+          .wait('Do you want to invoke this function on a recurring schedule?')
+          .sendLine('n')
+          .wait('Do you want to edit the local lambda function now')
+          .sendLine('n');
+      }
+
+      chain
+        .wait('Restrict API access')
+        .sendLine('n')
+        .wait('Do you want to add another path')
+        .sendLine('n')
+        .sendEof()
+        .run((err: Error) => {
+          if (!err) {
+            resolve();
+          } else {
+            reject(err);
+          }
+        });
+    }
   });
 }

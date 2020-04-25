@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "commonjs",
+    "lib": [
+      "DOM",
+      "ESnext"
+    ],
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "composite": true,
+    "removeComments": true,
+    "strict": true,
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "resolveJsonModule": true,
+    "preserveConstEnums": true,
+    "pretty": true
+  },
+  "exclude": [
+    "**/node_modules/**/*",
+    "**/__mocks__/**/*",
+    "**/__tests__/**/*",
+    "**/lib/**/*"
+  ]
+}

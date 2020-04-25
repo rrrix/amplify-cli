@@ -93,6 +93,10 @@ export interface TransformConfig {
    */
   Version?: number;
   /**
+   * A flag added to keep a track of a change noted in elasticsearch
+   */
+  ElasticsearchWarning?: boolean;
+  /**
    * Object which states info about a resolver's configuration
    * Such as sync configuration for appsync local support
    */
@@ -133,6 +137,9 @@ export async function writeConfig(projectDir: string, config: TransformConfig): 
  */
 interface ProjectConfiguration {
   schema: string;
+  functions: {
+    [k: string]: string;
+  };
   resolvers: {
     [k: string]: string;
   };
@@ -144,7 +151,25 @@ interface ProjectConfiguration {
 export async function loadProject(projectDirectory: string, opts?: ProjectOptions): Promise<ProjectConfiguration> {
   // Schema
   const schema = await readSchema(projectDirectory);
-  // Load the resolvers.
+
+  // Load functions
+  const functions = {};
+  if (!(opts && opts.disableFunctionOverrides === true)) {
+    const functionDirectory = path.join(projectDirectory, 'functions');
+    const functionDirectoryExists = await fs.exists(functionDirectory);
+    if (functionDirectoryExists) {
+      const functionFiles = await fs.readdir(functionDirectory);
+      for (const functionFile of functionFiles) {
+        if (functionFile.indexOf('.') === 0) {
+          continue;
+        }
+        const functionFilePath = path.join(functionDirectory, functionFile);
+        functions[functionFile] = functionFilePath;
+      }
+    }
+  }
+
+  // Load the resolvers
   const resolvers = {};
   if (!(opts && opts.disableResolverOverrides === true)) {
     const resolverDirectory = path.join(projectDirectory, 'resolvers');
@@ -160,6 +185,8 @@ export async function loadProject(projectDirectory: string, opts?: ProjectOption
       }
     }
   }
+
+  // Load Stacks
   const stacksDirectory = path.join(projectDirectory, 'stacks');
   const stacksDirExists = await fs.exists(stacksDirectory);
   const stacks = {};
@@ -183,6 +210,7 @@ export async function loadProject(projectDirectory: string, opts?: ProjectOption
 
   const config = await loadConfig(projectDirectory);
   return {
+    functions,
     stacks,
     resolvers,
     schema,

@@ -1,24 +1,45 @@
 {
   "name": "amplify-codegen-appsync-model-plugin",
-  "version": "1.4.0",
-  "main": "lib/index.js",
+  "version": "1.16.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aws-amplify/amplify-cli.git",
+    "directory": "packages/amplify-codegen-appsync-model-plugin"
+  },
   "author": "Amazon Web Services",
   "license": "Apache-2.0",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "keywords": [
+    "graphql",
+    "appsync",
+    "aws"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "test-watch": "jest --watch",
+    "test": "jest",
+    "test-ci": "jest --ci"
+  },
   "dependencies": {
-    "@graphql-codegen/core": "~1.8.1",
-    "@graphql-codegen/java-common": "~1.8.2",
-    "@graphql-codegen/visitor-plugin-common": "~1.8.1",
-    "auto-bind": "^2.1.1",
-    "chalk": "^2.4.2",
-    "change-case": "^3.1.0",
-    "graphql-tag": "^2.10.1",
-    "graphql-toolkit": "^0.5.17",
-    "pluralize": "^8.0.0",
-    "strip-indent": "^3.0.0",
-    "ts-dedent": "^1.1.0"
+    "@graphql-codegen/plugin-helpers": "^X",
+    "@graphql-codegen/visitor-plugin-common": "^X",
+    "@graphql-toolkit/common": "^X",
+    "chalk": "^X",
+    "change-case": "^X",
+    "lower-case-first": "^X",
+    "pluralize": "^X",
+    "strip-indent": "^X",
+    "ts-dedent": "^X"
+  },
+  "devDependencies": {
+    "@graphql-codegen/testing": "^X",
+    "graphql": "^14.0.0",
+    "java-ast": "^X"
   },
   "peerDependencies": {
-    "graphql": "^0.8.0 || ^0.9.0 || ^0.10.0 || ^0.11.0 || ^0.12.0 || ^0.13.0 || ^14.0.0"
+    "graphql": "^14.0.0"
   },
   "typescript": {
     "definition": "lib/index.d.ts"
@@ -41,20 +62,5 @@
       "ts",
       "js"
     ]
-  },
-  "devDependencies": {
-    "@graphql-codegen/testing": "1.8.3",
-    "graphql": "^0.13.2",
-    "java-ast": "^0.1.0",
-    "jest": "24.9.0",
-    "ts-jest": "24.1.0",
-    "typescript": "~3.6.4"
-  },
-  "scripts": {
-    "build": "tsc",
-    "watch": "tsc -w",
-    "test-watch": "jest --watch",
-    "test": "jest",
-    "test-ci": "jest --ci"
   }
 }

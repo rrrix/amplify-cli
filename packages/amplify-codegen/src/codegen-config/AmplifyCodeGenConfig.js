@@ -1,6 +1,6 @@
 const graphQLConfig = require('graphql-config');
 const { join, isAbsolute, relative } = require('path');
-const upath = require('upath');
+const slash = require('slash');
 const { graphQlToAmplifyConfig } = require('./utils');
 
 class AmplifyCodeGenConfig {
@@ -83,10 +83,10 @@ class AmplifyCodeGenConfig {
       includes: [],
       excludes: [],
     };
-    updatedProj.schemaPath = upath.toUnix(proj.schemaPath);
+    updatedProj.schemaPath = slash(proj.schemaPath);
     try {
-      updatedProj.includes = (proj.includes || []).map(p => upath.toUnix(p));
-      updatedProj.excludes = (proj.excludes || []).map(p => upath.toUnix(p));
+      updatedProj.includes = (proj.includes || []).map(p => slash(p));
+      updatedProj.excludes = (proj.excludes || []).map(p => slash(p));
     } catch (error) {
       console.log(error);
     }
@@ -94,11 +94,9 @@ class AmplifyCodeGenConfig {
       ...proj.extensions.amplify,
     };
     amplifyExtension.generatedFileName = amplifyExtension.generatedFileName
-      ? upath.toUnix(amplifyExtension.generatedFileName)
+      ? slash(amplifyExtension.generatedFileName)
       : amplifyExtension.generatedFileName;
-    amplifyExtension.docsFilePath = amplifyExtension.docsFilePath
-      ? upath.toUnix(amplifyExtension.docsFilePath)
-      : amplifyExtension.docsFilePath;
+    amplifyExtension.docsFilePath = amplifyExtension.docsFilePath ? slash(amplifyExtension.docsFilePath) : amplifyExtension.docsFilePath;
 
     updatedProj.extensions = {
       amplify: amplifyExtension,

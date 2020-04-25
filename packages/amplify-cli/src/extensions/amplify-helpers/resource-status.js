@@ -63,16 +63,13 @@ function filterResources(resources, filteredResources) {
 
   resources = resources.filter(resource => {
     let common = false;
-    for (let i = 0; i < filteredResources.length; i += 1) {
+    for (let i = 0; i < filteredResources.length; ++i) {
       if (filteredResources[i].category === resource.category && filteredResources[i].resourceName === resource.resourceName) {
         common = true;
         break;
       }
     }
-    if (common === true) {
-      return true;
-    }
-    return false;
+    return common;
   });
 
   return resources;
@@ -138,9 +135,9 @@ function getResourcesToBeCreated(amplifyMeta, currentamplifyMeta, category, reso
 
   // Check for dependencies and add them
 
-  for (let i = 0; i < resources.length; i += 1) {
+  for (let i = 0; i < resources.length; ++i) {
     if (resources[i].dependsOn && resources[i].dependsOn.length > 0) {
-      for (let j = 0; j < resources[i].dependsOn.length; j += 1) {
+      for (let j = 0; j < resources[i].dependsOn.length; ++j) {
         const dependsOnCategory = resources[i].dependsOn[j].category;
         const dependsOnResourcename = resources[i].dependsOn[j].resourceName;
         if (
@@ -198,7 +195,7 @@ async function getResourcesToBeUpdated(amplifyMeta, currentamplifyMeta, category
           const backendModified = await isBackendDirModifiedSinceLastPush(
             resource,
             categoryName,
-            currentamplifyMeta[categoryName][resource].lastPushTimeStamp
+            currentamplifyMeta[categoryName][resource].lastPushTimeStamp,
           );
 
           if (backendModified) {
@@ -225,7 +222,7 @@ async function getResourcesToBeUpdated(amplifyMeta, currentamplifyMeta, category
 }
 
 async function asyncForEach(array, callback) {
-  for (let index = 0; index < array.length; index += 1) {
+  for (let index = 0; index < array.length; ++index) {
     await callback(array[index], index, array);
   }
 }
@@ -244,7 +241,7 @@ async function getResourceStatus(category, resourceName, providerName, filteredR
     amplifyMeta = readJsonFile(backendConfigFilePath);
   } else {
     throw new Error(
-      "You are not working inside a valid amplify project.\nUse 'amplify init' in the root of your app directory to initialize your project with Amplify"
+      "You are not working inside a valid amplify project.\nUse 'amplify init' in the root of your app directory to initialize your project with Amplify",
     );
   }
 
@@ -284,7 +281,7 @@ async function showResourceTable(category, resourceName, filteredResources) {
     category,
     resourceName,
     undefined,
-    filteredResources
+    filteredResources,
   );
 
   let noChangeResources = _.differenceWith(allResources, resourcesToBeCreated.concat(resourcesToBeUpdated), _.isEqual);
@@ -295,7 +292,7 @@ async function showResourceTable(category, resourceName, filteredResources) {
   const deleteOperationLabel = 'Delete';
   const noOperationLabel = 'No Change';
   const tableOptions = [['Category', 'Resource name', 'Operation', 'Provider plugin']];
-  for (let i = 0; i < resourcesToBeCreated.length; i += 1) {
+  for (let i = 0; i < resourcesToBeCreated.length; ++i) {
     tableOptions.push([
       capitalize(resourcesToBeCreated[i].category),
       resourcesToBeCreated[i].resourceName,
@@ -303,7 +300,7 @@ async function showResourceTable(category, resourceName, filteredResources) {
       resourcesToBeCreated[i].providerPlugin,
     ]);
   }
-  for (let i = 0; i < resourcesToBeUpdated.length; i += 1) {
+  for (let i = 0; i < resourcesToBeUpdated.length; ++i) {
     tableOptions.push([
       capitalize(resourcesToBeUpdated[i].category),
       resourcesToBeUpdated[i].resourceName,
@@ -311,7 +308,7 @@ async function showResourceTable(category, resourceName, filteredResources) {
       resourcesToBeUpdated[i].providerPlugin,
     ]);
   }
-  for (let i = 0; i < resourcesToBeDeleted.length; i += 1) {
+  for (let i = 0; i < resourcesToBeDeleted.length; ++i) {
     tableOptions.push([
       capitalize(resourcesToBeDeleted[i].category),
       resourcesToBeDeleted[i].resourceName,
@@ -319,7 +316,7 @@ async function showResourceTable(category, resourceName, filteredResources) {
       resourcesToBeDeleted[i].providerPlugin,
     ]);
   }
-  for (let i = 0; i < noChangeResources.length; i += 1) {
+  for (let i = 0; i < noChangeResources.length; ++i) {
     tableOptions.push([
       capitalize(noChangeResources[i].category),
       noChangeResources[i].resourceName,

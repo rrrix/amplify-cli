@@ -319,6 +319,7 @@ function getNamedProfiles() {
 module.exports = {
   setProfile,
   getProfiledAwsConfig,
+  getProfileCredentials,
   getProfileRegion,
   getNamedProfiles,
   resetCache,
